@@ -1,0 +1,12 @@
+diff --git a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -11847,7 +11860,7 @@ esac
+ 
+ 
+ LDFLAGS="$LIBM $LDFLAGS"
+-CFLAGS="-Wall"
++CFLAGS="-Wall $CFLAGS"
+ 
+ ac_ext=cpp
+ ac_cpp='$CXXCPP $CPPFLAGS'

@@ -1,0 +1,6 @@
+NAME=cmph
+VERSION=2.0
+URL=https://sourceforge.net/projects/cmph/files/cmph/cmph-2.0.tar.gz
+LICENSE=LGPL
+SHA1=eabdd4cd9f9bb2fed6773caac8d91638ad2d02b7
+DISABLED_TOOLCHAIN=(emscripten)

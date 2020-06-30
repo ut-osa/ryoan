@@ -1,0 +1,7 @@
+NAME=tiff
+VERSION=4.0.6
+URL=http://download.osgeo.org/libtiff/tiff-4.0.6.tar.gz
+DEPENDS=(xz)
+LICENSE=BSD:COPYRIGHT
+SHA1=280e27704eaca5f592b82e71ac0c78b87395e2de
+DISABLED_TOOLCHAIN=(emscripten)

@@ -1,0 +1,9 @@
+*.swp
+*.pyc
+out
+nacl_sdk*
+/examples_data.tar.xz
+/examples/CIFAR
+/examples/MNIST
+/examples/IMAGENET
+/examples/.idea

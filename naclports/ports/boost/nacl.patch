@@ -1,0 +1,711 @@
+diff --git a/boost/config/platform/nacl.hpp b/boost/config/platform/nacl.hpp
+new file mode 100644
+--- /dev/null
++++ b/boost/config/platform/nacl.hpp
+@@ -0,0 +1,82 @@
++// Copyright (c) 2013 The Native Client Authors.
++// Use, modification and distribution are subject to the
++// Boost Software License, Version 1.0. (See accompanying file
++// LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
++
++// See http://www.boost.org for most recent version.
++
++// Native Client specific config options:
++
++#define BOOST_PLATFORM "nacl"
++
++// make sure we have __GLIBC_PREREQ if available at all
++#ifdef __cplusplus
++#include <cstdlib>
++#else
++#include <stdlib.h>
++#endif
++
++#define BOOST_HAS_STDINT_H
++#define BOOST_HAS_GETTIMEOFDAY
++#define BOOST_HAS_NANOSLEEP
++
++#if defined(__LIBCOMO__)
++   //
++   // como on linux doesn't have std:: c functions:
++   // NOTE: versions of libcomo prior to beta28 have octal version numbering,
++   // e.g. version 25 is 21 (dec)
++   //
++#  if __LIBCOMO_VERSION__ <= 20
++#    define BOOST_NO_STDC_NAMESPACE
++#  endif
++
++#  if __LIBCOMO_VERSION__ <= 21
++#    define BOOST_NO_SWPRINTF
++#  endif
++
++#endif
++
++#if defined(__GLIBC__) && defined(__GLIBC_PREREQ)
++// __GLIBC_PREREQ is available since 2.1.2
++
++   // swprintf is available since glibc 2.2.0
++#  if !__GLIBC_PREREQ(2,2) || (!defined(__USE_ISOC99) && !defined(__USE_UNIX98))
++#    define BOOST_NO_SWPRINTF
++#  endif
++#else
++#  define BOOST_NO_SWPRINTF
++#endif
++
++// boilerplate code:
++#define BOOST_HAS_UNISTD_H
++#include <boost/config/posix_features.hpp>
++#ifdef _NEWLIB_VERSION
++  #define BOOST_HAS_SCHED_YIELD
++  #define BOOST_HAS_PTHREADS
++#endif
++
++#ifndef __GNUC__
++//
++// if the compiler is not gcc we still need to be able to parse
++// the GNU system headers, some of which (mainly <stdint.h>)
++// use GNU specific extensions:
++//
++#  ifndef __extension__
++#     define __extension__
++#  endif
++#  ifndef __const__
++#     define __const__ const
++#  endif
++#  ifndef __volatile__
++#     define __volatile__ volatile
++#  endif
++#  ifndef __signed__
++#     define __signed__ signed
++#  endif
++#  ifndef __typeof__
++#     define __typeof__ typeof
++#  endif
++#  ifndef __inline__
++#     define __inline__ inline
++#  endif
++#endif
+diff --git a/boost/config/select_platform_config.hpp b/boost/config/select_platform_config.hpp
+--- a/boost/config/select_platform_config.hpp
++++ b/boost/config/select_platform_config.hpp
+@@ -76,6 +76,10 @@
+ #elif defined(__VMS) 
+ // VMS:
+ #  define BOOST_PLATFORM_CONFIG "boost/config/platform/vms.hpp" 
++
++#elif defined(__native_client__)
++// Native Client:
++#  define BOOST_PLATFORM_CONFIG "boost/config/platform/nacl.hpp"
+ #else
+ 
+ #  if defined(unix) \
+diff --git a/boost/log/detail/light_rw_mutex.hpp b/boost/log/detail/light_rw_mutex.hpp
+--- a/boost/log/detail/light_rw_mutex.hpp
++++ b/boost/log/detail/light_rw_mutex.hpp
+@@ -26,6 +26,7 @@
+ 
+ #include <boost/log/detail/header.hpp>
+ 
++#ifndef _NEWLIB_VERSION
+ #if defined(BOOST_THREAD_POSIX) // This one can be defined by users, so it should go first
+ #define BOOST_LOG_LWRWMUTEX_USE_PTHREAD
+ #elif defined(BOOST_WINDOWS) && defined(BOOST_LOG_USE_WINNT6_API)
+@@ -33,6 +34,7 @@
+ #elif defined(BOOST_HAS_PTHREADS)
+ #define BOOST_LOG_LWRWMUTEX_USE_PTHREAD
+ #endif
++#endif
+ 
+ #if defined(BOOST_LOG_LWRWMUTEX_USE_SRWLOCK)
+ 
+diff --git a/boost/test/impl/debug.ipp b/boost/test/impl/debug.ipp
+--- a/boost/test/impl/debug.ipp
++++ b/boost/test/impl/debug.ipp
+@@ -857,14 +857,14 @@ attach_debugger( bool break_or_continue )
+ 
+     return true;
+ 
+-#elif defined(BOOST_UNIX_BASED_DEBUG) // ********************** UNIX
++#elif defined(BOOST_UNIX_BASED_DEBUG) && !defined(__native_client__)// ********************** UNIX
+ 
+     char init_done_lock_fn[] = "/tmp/btl_dbg_init_done_XXXXXX";
+     fd_holder init_done_lock_fd( ::mkstemp( init_done_lock_fn ) );
+ 
+     if( init_done_lock_fd == -1 )
+         return false;
+-    
++
+     pid_t child_pid = fork();
+ 
+     if( child_pid == -1 )
+diff --git a/libs/filesystem/src/operations.cpp b/libs/filesystem/src/operations.cpp
+--- a/libs/filesystem/src/operations.cpp
++++ b/libs/filesystem/src/operations.cpp
+@@ -8,17 +8,17 @@
+ 
+ //  See library home page at http://www.boost.org/libs/filesystem
+ 
+-//--------------------------------------------------------------------------------------// 
++//--------------------------------------------------------------------------------------//
+ 
+-//  define 64-bit offset macros BEFORE including boost/config.hpp (see ticket #5355) 
++//  define 64-bit offset macros BEFORE including boost/config.hpp (see ticket #5355)
+ #if !(defined(__HP_aCC) && defined(_ILP32) && !defined(_STATVFS_ACPP_PROBLEMS_FIXED))
+ #define _FILE_OFFSET_BITS 64 // at worst, these defines may have no effect,
+ #endif
+ #if !defined(__PGI)
+ #define __USE_FILE_OFFSET64 // but that is harmless on Windows and on POSIX
+-      // 64-bit systems or on 32-bit systems which don't have files larger 
+-      // than can be represented by a traditional POSIX/UNIX off_t type. 
+-      // OTOH, defining them should kick in 64-bit off_t's (and thus 
++      // 64-bit systems or on 32-bit systems which don't have files larger
++      // than can be represented by a traditional POSIX/UNIX off_t type.
++      // OTOH, defining them should kick in 64-bit off_t's (and thus
+       // st_size)on 32-bit systems that provide the Large File
+       // Support (LFS)interface, such as Linux, Solaris, and IRIX.
+       // The defines are given before any headers are included to
+@@ -31,9 +31,9 @@
+ 
+ // define BOOST_FILESYSTEM_SOURCE so that <boost/filesystem/config.hpp> knows
+ // the library is being built (possibly exporting rather than importing code)
+-#define BOOST_FILESYSTEM_SOURCE 
++#define BOOST_FILESYSTEM_SOURCE
+ 
+-#ifndef BOOST_SYSTEM_NO_DEPRECATED 
++#ifndef BOOST_SYSTEM_NO_DEPRECATED
+ # define BOOST_SYSTEM_NO_DEPRECATED
+ #endif
+ 
+@@ -44,11 +44,11 @@
+ #include <boost/filesystem/operations.hpp>
+ #include <boost/scoped_array.hpp>
+ #include <boost/detail/workaround.hpp>
+-#include <vector> 
++#include <vector>
+ #include <cstdlib>     // for malloc, free
+ #include <cstring>
+ #include <cstdio>      // for remove, rename
+-#if defined(__QNXNTO__)  // see ticket #5355 
++#if defined(__QNXNTO__)  // see ticket #5355
+ # include <stdio.h>
+ #endif
+ #include <cerrno>
+@@ -117,7 +117,7 @@ using std::wstring;
+ #     include <sys/utime.h>
+ #   endif
+ 
+-//  REPARSE_DATA_BUFFER related definitions are found in ntifs.h, which is part of the 
++//  REPARSE_DATA_BUFFER related definitions are found in ntifs.h, which is part of the
+ //  Windows Device Driver Kit. Since that's inconvenient, the definitions are provided
+ //  here. See http://msdn.microsoft.com/en-us/library/ms791514.aspx
+ 
+@@ -170,7 +170,7 @@ typedef struct _REPARSE_DATA_BUFFER {
+ # endif
+ 
+ # ifndef IO_REPARSE_TAG_SYMLINK
+-#   define IO_REPARSE_TAG_SYMLINK (0xA000000CL)       
++#   define IO_REPARSE_TAG_SYMLINK (0xA000000CL)
+ # endif
+ 
+ # endif  // BOOST_WINDOWS_API
+@@ -197,7 +197,7 @@ typedef struct _REPARSE_DATA_BUFFER {
+ # if defined(BOOST_POSIX_API)
+ 
+ //  POSIX uses a 0 return to indicate success
+-#   define BOOST_ERRNO    errno 
++#   define BOOST_ERRNO    errno
+ #   define BOOST_SET_CURRENT_DIRECTORY(P)(::chdir(P)== 0)
+ #   define BOOST_CREATE_DIRECTORY(P)(::mkdir(P, S_IRWXU|S_IRWXG|S_IRWXO)== 0)
+ #   define BOOST_CREATE_HARD_LINK(F,T)(::link(T, F)== 0)
+@@ -256,7 +256,7 @@ namespace
+     {
+       if (ec != 0) ec->clear();
+     }
+-    else  
++    else
+     { //  error
+       if (ec == 0)
+         BOOST_FILESYSTEM_THROW(filesystem_error(message,
+@@ -273,7 +273,7 @@ namespace
+     {
+       if (ec != 0) ec->clear();
+     }
+-    else  
++    else
+     { //  error
+       if (ec == 0)
+         BOOST_FILESYSTEM_THROW(filesystem_error(message,
+@@ -291,7 +291,7 @@ namespace
+     {
+       if (ec != 0) ec->clear();
+     }
+-    else  
++    else
+     { //  error
+       if (ec == 0)
+         BOOST_FILESYSTEM_THROW(filesystem_error(message,
+@@ -310,7 +310,7 @@ namespace
+     {
+       if (ec != 0) ec->clear();
+     }
+-    else  
++    else
+     { //  error
+       if (ec == 0)
+         BOOST_FILESYSTEM_THROW(filesystem_error(message, p, result));
+@@ -328,7 +328,7 @@ namespace
+     {
+       if (ec != 0) ec->clear();
+     }
+-    else  
++    else
+     { //  error
+       if (ec == 0)
+         BOOST_FILESYSTEM_THROW(filesystem_error(message, p1, p2, result));
+@@ -345,10 +345,10 @@ namespace
+ 
+   bool remove_directory(const path& p) // true if succeeds
+     { return BOOST_REMOVE_DIRECTORY(p.c_str()); }
+-  
++
+   bool remove_file(const path& p) // true if succeeds
+     { return BOOST_DELETE_FILE(p.c_str()); }
+-  
++
+   // called by remove and remove_all_aux
+   bool remove_file_or_directory(const path& p, fs::file_type type, error_code* ec)
+     // return true if file removed, false if not removed
+@@ -427,7 +427,7 @@ namespace
+ 
+     struct stat from_stat;
+     if (::stat(from_p.c_str(), &from_stat)!= 0)
+-    { 
++    {
+       ::close(infile);
+       return false;
+     }
+@@ -455,7 +455,7 @@ namespace
+       {
+         if ((sz = ::write(outfile, buf.get() + sz_write,
+           sz_read - sz_write))< 0)
+-        { 
++        {
+           sz_read = sz; // cause read loop termination
+           break;        //  and error to be thrown after closes
+         }
+@@ -546,7 +546,7 @@ namespace
+   }
+ 
+   // Thanks to Jeremy Maitin-Shepard for much help and for permission to
+-  // base the equivalent()implementation on portions of his 
++  // base the equivalent()implementation on portions of his
+   // file-equivalence-win32.cpp experimental code.
+ 
+   struct handle_wrapper
+@@ -579,14 +579,14 @@ namespace
+     if (h.handle == INVALID_HANDLE_VALUE)
+       return false;
+ 
+-    boost::scoped_array<char> buf(new char [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]);    
+- 
++    boost::scoped_array<char> buf(new char [MAXIMUM_REPARSE_DATA_BUFFER_SIZE]);
++
+     // Query the reparse data
+     DWORD dwRetLen;
+     BOOL result = ::DeviceIoControl(h.handle, FSCTL_GET_REPARSE_POINT, NULL, 0, buf.get(),
+       MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dwRetLen, NULL);
+     if (!result) return false;
+- 
++
+     return reinterpret_cast<const REPARSE_DATA_BUFFER*>(buf.get())
+       ->ReparseTag == IO_REPARSE_TAG_SYMLINK;
+   }
+@@ -907,7 +907,7 @@ namespace detail
+       new_symlink, existing_symlink, ec,
+       "boost::filesystem::copy_symlink");
+ 
+-# else  // modern Windows or BOOST_POSIX_API 
++# else  // modern Windows or BOOST_POSIX_API
+     path p(read_symlink(existing_symlink, ec));
+     if (ec != 0 && *ec) return;
+     create_symlink(p, new_symlink, ec);
+@@ -1065,7 +1065,7 @@ namespace detail
+       if (::getcwd(buf.get(), static_cast<std::size_t>(path_max))== 0)
+       {
+         if (error(errno != ERANGE
+-      // bug in some versions of the Metrowerks C lib on the Mac: wrong errno set 
++      // bug in some versions of the Metrowerks C lib on the Mac: wrong errno set
+ #         if defined(__MSL__) && (defined(macintosh) || defined(__APPLE__) || defined(__APPLE_CC__))
+           && errno != 0
+ #         endif
+@@ -1180,7 +1180,7 @@ namespace detail
+     // In theory, volume serial numbers are sufficient to distinguish between
+     // devices, but in practice VSN's are sometimes duplicated, so last write
+     // time and file size are also checked.
+-      return 
++      return
+         info1.dwVolumeSerialNumber == info2.dwVolumeSerialNumber
+         && info1.nFileIndexHigh == info2.nFileIndexHigh
+         && info1.nFileIndexLow == info2.nFileIndexLow
+@@ -1277,7 +1277,7 @@ namespace detail
+     struct stat path_stat;
+     if (error(::stat(p.c_str(), &path_stat)!= 0,
+         p, ec, "boost::filesystem::is_empty"))
+-      return false;        
++      return false;
+     return S_ISDIR(path_stat.st_mode)
+       ? is_empty_directory(p)
+       : path_stat.st_size == 0;
+@@ -1289,7 +1289,7 @@ namespace detail
+         return false;
+ 
+     if (ec != 0) ec->clear();
+-    return 
++    return
+       (fad.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+         ? is_empty_directory(p)
+         : (!fad.nFileSizeHigh && !fad.nFileSizeLow);
+@@ -1410,7 +1410,8 @@ namespace detail
+     //   "http://man7.org/linux/man-pages/man2/fchmodat.2.html"
+ #   if defined(AT_FDCWD) && defined(AT_SYMLINK_NOFOLLOW) \
+       && !(defined(__SUNPRO_CC) || defined(sun)) \
+-      && !(defined(linux) || defined(__linux) || defined(__linux__))
++      && !(defined(linux) || defined(__linux) || defined(__linux__)) \
++      && !defined(__native_client__)
+       if (::fchmodat(AT_FDCWD, p.c_str(), mode_cast(prms),
+            !(prms & symlink_perms) ? 0 : AT_SYMLINK_NOFOLLOW))
+ #   else  // fallback if fchmodat() not supported
+@@ -1513,7 +1514,7 @@ namespace detail
+ #     endif
+     return symlink_path;
+   }
+-  
++
+   BOOST_FILESYSTEM_DECL
+   bool remove(const path& p, error_code* ec)
+   {
+@@ -1560,15 +1561,17 @@ namespace detail
+   BOOST_FILESYSTEM_DECL
+   space_info space(const path& p, error_code* ec)
+   {
+-#   ifdef BOOST_POSIX_API
++#ifdef __native_client__
++    space_info info;
++#   elif defined(BOOST_POSIX_API)
+     struct BOOST_STATVFS vfs;
+     space_info info;
+     if (!error(::BOOST_STATVFS(p.c_str(), &vfs)!= 0,
+       p, ec, "boost::filesystem::space"))
+     {
+-      info.capacity 
++      info.capacity
+         = static_cast<boost::uintmax_t>(vfs.f_blocks)* BOOST_STATVFS_F_FRSIZE;
+-      info.free 
++      info.free
+         = static_cast<boost::uintmax_t>(vfs.f_bfree)* BOOST_STATVFS_F_FRSIZE;
+       info.available
+         = static_cast<boost::uintmax_t>(vfs.f_bavail)* BOOST_STATVFS_F_FRSIZE;
+@@ -1594,7 +1597,9 @@ namespace detail
+ 
+ #   endif
+ 
++#ifndef __native_client__
+     else
++#endif
+     {
+       info.capacity = info.free = info.available = 0;
+     }
+@@ -1753,23 +1758,23 @@ namespace detail
+   {
+ #   ifdef BOOST_POSIX_API
+       const char* val = 0;
+-      
++
+       (val = std::getenv("TMPDIR" )) ||
+       (val = std::getenv("TMP"    )) ||
+       (val = std::getenv("TEMP"   )) ||
+       (val = std::getenv("TEMPDIR"));
+-      
++
+       path p((val!=0) ? val : "/tmp");
+-      
++
+       if (p.empty() || (ec&&!is_directory(p, *ec))||(!ec&&!is_directory(p)))
+       {
+         errno = ENOTDIR;
+         error(true, p, ec, "boost::filesystem::temp_directory_path");
+         return p;
+       }
+-        
++
+       return p;
+-      
++
+ #   else  // Windows
+ 
+       std::vector<path::value_type> buf(GetTempPathW(0, NULL));
+@@ -1780,22 +1785,22 @@ namespace detail
+         error(true, ec, "boost::filesystem::temp_directory_path");
+         return path();
+       }
+-          
++
+       buf.pop_back();
+-      
++
+       path p(buf.begin(), buf.end());
+-          
++
+       if ((ec&&!is_directory(p, *ec))||(!ec&&!is_directory(p)))
+       {
+         ::SetLastError(ENOTDIR);
+         error(true, p, ec, "boost::filesystem::temp_directory_path");
+         return path();
+       }
+-      
++
+       return p;
+ #   endif
+   }
+-  
++
+   BOOST_FILESYSTEM_DECL
+   path system_complete(const path& p, system::error_code* ec)
+   {
+@@ -1846,7 +1851,7 @@ namespace detail
+       // symlink status to the regular status.
+       if (status_known(m_symlink_status)
+         && !is_symlink(m_symlink_status))
+-      { 
++      {
+         m_status = m_symlink_status;
+         if (ec != 0) ec->clear();
+       }
+@@ -1865,7 +1870,7 @@ namespace detail
+     return m_symlink_status;
+   }
+ 
+-//  dispatch directory_entry supplied here rather than in 
++//  dispatch directory_entry supplied here rather than in
+ //  <boost/filesystem/path_traits.hpp>, thus avoiding header circularity.
+ //  test cases are in operations_unit_test.cpp
+ 
+@@ -1874,7 +1879,7 @@ namespace path_traits
+   void dispatch(const directory_entry & de,
+ #                ifdef BOOST_WINDOWS_API
+                  std::wstring& to,
+-#                else   
++#                else
+                  std::string& to,
+ #                endif
+                  const codecvt_type &)
+@@ -1941,7 +1946,7 @@ namespace
+     buffer = std::malloc((sizeof(dirent) - sizeof(de.d_name))
+       +  path_size + 1); // + 1 for "/0"
+     return ok;
+-  }  
++  }
+ 
+   // warning: the only dirent member updated is d_name
+   inline int readdir_r_simulator(DIR * dirp, struct dirent * entry,
+@@ -2022,11 +2027,11 @@ namespace
+     WIN32_FIND_DATAW data;
+     if ((handle = ::FindFirstFileW(dirpath.c_str(), &data))
+       == INVALID_HANDLE_VALUE)
+-    { 
++    {
+       handle = 0;  // signal eof
+       return error_code( (::GetLastError() == ERROR_FILE_NOT_FOUND
+-                       // Windows Mobile returns ERROR_NO_MORE_FILES; see ticket #3551                                           
+-                       || ::GetLastError() == ERROR_NO_MORE_FILES) 
++                       // Windows Mobile returns ERROR_NO_MORE_FILES; see ticket #3551
++                       || ::GetLastError() == ERROR_NO_MORE_FILES)
+         ? 0 : ::GetLastError(), system_category() );
+     }
+     target = data.cFileName;
+@@ -2098,7 +2103,7 @@ namespace
+ #     ifdef BOOST_WINDOWS_API
+         ERROR_PATH_NOT_FOUND
+ #     else
+-        ENOENT 
++        ENOENT
+ #     endif
+         , system_category());
+ 
+@@ -2111,7 +2116,7 @@ namespace filesystem
+ 
+ namespace detail
+ {
+-  //  dir_itr_close is called both from the ~dir_itr_imp()destructor 
++  //  dir_itr_close is called both from the ~dir_itr_imp()destructor
+   //  and dir_itr_increment()
+   BOOST_FILESYSTEM_DECL
+   system::error_code dir_itr_close( // never throws
+@@ -2141,7 +2146,7 @@ namespace detail
+   }
+ 
+   void directory_iterator_construct(directory_iterator& it,
+-    const path& p, system::error_code* ec)    
++    const path& p, system::error_code* ec)
+   {
+     if (error(p.empty(), not_found_error_code, p, ec,
+               "boost::filesystem::directory_iterator::construct"))
+@@ -2162,7 +2167,7 @@ namespace detail
+         ec, "boost::filesystem::directory_iterator::construct");
+       return;
+     }
+-    
++
+     if (it.m_imp->handle == 0)
+       it.m_imp.reset(); // eof, so make end iterator
+     else // not eof
+@@ -2181,7 +2186,7 @@ namespace detail
+   {
+     BOOST_ASSERT_MSG(it.m_imp.get(), "attempt to increment end iterator");
+     BOOST_ASSERT_MSG(it.m_imp->handle != 0, "internal program error");
+-    
++
+     path::string_type filename;
+     file_status file_stat, symlink_file_stat;
+     system::error_code temp_ec;
+diff --git a/libs/system/src/error_code.cpp b/libs/system/src/error_code.cpp
+--- a/libs/system/src/error_code.cpp
++++ b/libs/system/src/error_code.cpp
+@@ -101,7 +101,7 @@ namespace
+       char buf[64];
+       char * bp = buf;
+       std::size_t sz = sizeof(buf);
+-  #  if defined(__CYGWIN__) || defined(__USE_GNU)
++  #  if defined(__CYGWIN__) || defined(__USE_GNU) || defined _NEWLIB_VERSION
+       // Oddball version of strerror_r
+       const char * c_str = strerror_r( ev, bp, sz );
+       return  c_str
+@@ -251,7 +251,9 @@ namespace
+     case ENOTEMPTY: return make_error_condition( directory_not_empty );
+   # endif // ENOTEMPTY != EEXIST
+   # if ENOTRECOVERABLE != ECONNRESET // the same on some Broadcom chips 
++  # ifndef __pnacl__
+     case ENOTRECOVERABLE: return make_error_condition( state_not_recoverable ); 
++  # endif
+   # endif // ENOTRECOVERABLE != ECONNRESET 
+     case ENOTSOCK: return make_error_condition( not_a_socket );
+     case ENOTSUP: return make_error_condition( not_supported );
+@@ -262,7 +264,9 @@ namespace
+   # endif // EOPNOTSUPP != ENOTSUP
+     case EOVERFLOW: return make_error_condition( value_too_large );
+   # if EOWNERDEAD != ECONNABORTED // the same on some Broadcom chips 
++  # ifndef __pnacl__
+     case EOWNERDEAD: return make_error_condition( owner_dead ); 
++  # endif
+   # endif // EOWNERDEAD != ECONNABORTED 
+     case EPERM: return make_error_condition( operation_not_permitted );
+     case EPIPE: return make_error_condition( broken_pipe );
+diff --git a/tools/build/v2/tools/gcc.jam b/tools/build/v2/tools/gcc.jam
+--- a/tools/build/v2/tools/gcc.jam
++++ b/tools/build/v2/tools/gcc.jam
+@@ -1032,7 +1032,7 @@ rule setup-threading ( targets * : sources * : properties * )
+             case *bsd    : option = -pthread ;  # There is no -lrt on BSD.
+             case sgi     : # gcc on IRIX does not support multi-threading.
+             case darwin  : # No threading options.
+-            case *       : option = -pthread ; libs = rt ;
++            case *       : option = -pthread ;
+         }
+ 
+         if $(option)
+diff --git a/tools/build/v2/user-config.jam b/tools/build/v2/user-config.jam
+--- a/tools/build/v2/user-config.jam
++++ b/tools/build/v2/user-config.jam
+@@ -1,92 +1 @@
+-# Copyright 2003, 2005 Douglas Gregor
+-# Copyright 2004 John Maddock
+-# Copyright 2002, 2003, 2004, 2007 Vladimir Prus
+-# Distributed under the Boost Software License, Version 1.0.
+-# (See accompanying file LICENSE_1_0.txt or http://www.boost.org/LICENSE_1_0.txt)
+-
+-#   This file is used to configure your Boost.Build installation. You can modify
+-# this file in place, or you can place it in a permanent location so that it
+-# does not get overwritten should you get a new version of Boost.Build. See:
+-#
+-#   http://www.boost.org/boost-build2/doc/html/bbv2/overview/configuration.html
+-#
+-# for documentation about possible permanent locations.
+-
+-#   This file specifies which toolsets (C++ compilers), libraries, and other
+-# tools are available. Often, you should be able to just uncomment existing
+-# example lines and adjust them to taste. The complete list of supported tools,
+-# and configuration instructions can be found at:
+-#
+-#   http://boost.org/boost-build2/doc/html/bbv2/reference/tools.html
+-#
+-
+-#   This file uses Jam language syntax to describe available tools. Mostly,
+-# there are 'using' lines, that contain the name of the used tools, and
+-# parameters to pass to those tools -- where paremeters are separated by
+-# semicolons. Important syntax notes:
+-#
+-#   - Both ':' and ';' must be separated from other tokens by whitespace
+-#   - The '\' symbol is a quote character, so when specifying Windows paths you
+-#     should use '/' or '\\' instead.
+-#
+-# More details about the syntax can be found at:
+-#
+-#   http://boost.org/boost-build2/doc/html/bbv2/advanced.html#bbv2.advanced.jam_language
+-#
+-
+-# ------------------
+-# GCC configuration.
+-# ------------------
+-
+-# Configure gcc (default version).
+-# using gcc ;
+-
+-# Configure specific gcc version, giving alternative name to use.
+-# using gcc : 3.2 : g++-3.2 ;
+-
+-
+-# -------------------
+-# MSVC configuration.
+-# -------------------
+-
+-# Configure msvc (default version, searched for in standard locations and PATH).
+-# using msvc ;
+-
+-# Configure specific msvc version (searched for in standard locations and PATH).
+-# using msvc : 8.0 ;
+-
+-
+-# ----------------------
+-# Borland configuration.
+-# ----------------------
+-# using borland ;
+-
+-
+-# ----------------------
+-# STLPort configuration.
+-# ----------------------
+-
+-#   Configure specifying location of STLPort headers. Libraries must be either
+-# not needed or available to the compiler by default.
+-# using stlport : : /usr/include/stlport ;
+-
+-# Configure specifying location of both headers and libraries explicitly.
+-# using stlport : : /usr/include/stlport /usr/lib ;
+-
+-
+-# -----------------
+-# QT configuration.
+-# -----------------
+-
+-# Configure assuming QTDIR gives the installation prefix.
+-# using qt ;
+-
+-# Configure with an explicit installation prefix.
+-# using qt : /usr/opt/qt ;
+-
+-# ---------------------
+-# Python configuration.
+-# ---------------------
+-
+-# Configure specific Python version.
+-# using python : 3.1 : /usr/bin/python3 : /usr/include/python3.1 : /usr/lib ;
++using gcc : 3.6 : /home/zhitingz/Documents/native_client_sources/nacl_sdk/pepper_canary/toolchain/linux_pnacl/bin/x86_64-nacl-clang++ : <compileflags>-I/home/zhitingz/Documents/native_client_sources/nacl_sdk/pepper_canary/include <compileflags>-fcolor-diagnostics <compileflags>-I/home/zhitingz/Documents/native_client_sources/nacl_sdk/pepper_canary/toolchain/linux_pnacl/x86_64-nacl/usr/include/glibc-compat ;

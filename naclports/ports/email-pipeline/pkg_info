@@ -1,0 +1,4 @@
+NAME=email-pipeline
+VERSION=0.1
+DEPENDS=(libpipeline enclave-header clamav dspam dspam-tests)
+DISABLED_TOOLCHAIN=(emscripten)

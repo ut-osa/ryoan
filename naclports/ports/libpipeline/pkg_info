@@ -1,0 +1,4 @@
+NAME=libpipeline
+VERSION=0.1
+DEPENDS=(enclave-header openssl)
+DISABLED_TOOLCHAIN=(emscripten)

@@ -1,0 +1,8 @@
+NAME=mosesdecoder
+VERSION=RELEASE-3.0
+URL=https://github.com/moses-smt/mosesdecoder/archive/RELEASE-3.0/mosesdecoder-RELEASE-3.0.zip
+LICENSE=LGPL
+DEPENDS=(boost cmph)
+SHA1=515229f2b04fab8929ac951027588bcd0b6fc51b
+DISABLED_TOOLCHAIN=(emscripten)
+

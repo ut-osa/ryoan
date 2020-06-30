@@ -1,0 +1,10 @@
+NAME=opencv
+VERSION=3.1.0
+URL=https://github.com/Itseez/opencv/archive/3.1.0/opencv-3.1.0.tar.gz
+LICENSE=BSD:doc/license.txt
+# TODO(sbc): remove this conditional once this bug gets fixed:
+# https://code.google.com/p/nativeclient/issues/detail?id=3205
+DISABLED_ARCH=(arm)
+DEPENDS=(zlib eigen3 libpng jpeg9a tiff jasper libwebp glibc-compat)
+SHA1=31dd36c5d59c76f6b7982a64d6ffc0993736d7ea
+DISABLED_TOOLCHAIN=(emscripten)

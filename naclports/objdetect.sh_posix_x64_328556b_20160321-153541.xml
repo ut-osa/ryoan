@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites tests="0" failures="0" disabled="0" errors="0" timestamp="2016-03-21T20:58:32" time="0" cv_version="3.1.0" cv_vcs_version="328556b-dirty" cv_build_type="release" cv_parallel_framework="pthreads" cv_cpu_features="mmx sse sse2 sse3" cv_module_name="objdetect" cv_implementation="plain" cv_num_threads="-1" name="AllTests">
+</testsuites>

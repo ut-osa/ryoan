@@ -1,0 +1,2826 @@
+diff --git a/clamd/clamd.c b/clamd/clamd.c
+--- a/clamd/clamd.c
++++ b/clamd/clamd.c
+@@ -132,7 +132,7 @@ int main(int argc, char **argv)
+     if(check_flevel())
+         exit(1);
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     memset(&sa, 0, sizeof(sa));
+     sa.sa_handler = SIG_IGN;
+     sigaction(SIGHUP, &sa, NULL);
+@@ -177,7 +177,7 @@ int main(int argc, char **argv)
+     }
+ 
+     /* drop privileges */
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(geteuid() == 0 && (opt = optget(opts, "User"))->enabled) {
+         if((user = getpwnam(opt->strarg)) == NULL) {
+             fprintf(stderr, "ERROR: Can't get information about user %s.\n", opt->strarg);
+@@ -603,7 +603,7 @@ int main(int argc, char **argv)
+                 }
+             }
+         }
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         if(localsock) {
+             int *t;
+             mode_t sock_mode, umsk = umask(0777); /* socket is created with 000 to avoid races */
+@@ -722,7 +722,7 @@ int main(int argc, char **argv)
+         closesocket(lsockets[i]);
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(nlsockets && localsock) {
+         opt = optget(opts, "LocalSocket");
+ 
+diff --git a/clamd/others.c b/clamd/others.c
+--- a/clamd/others.c
++++ b/clamd/others.c
+@@ -83,7 +83,7 @@ static void xfree(void *p)
+         free(p);
+ }
+ 
+-#ifdef	_WIN32
++#if defined(_WIN32) || defined(__native_client__)
+ void
+ virusaction (const char *filename, const char *virname,
+              const struct optstruct *opts)
+diff --git a/clamd/server-th.c b/clamd/server-th.c
+--- a/clamd/server-th.c
++++ b/clamd/server-th.c
+@@ -701,7 +701,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	int max_threads, max_queue, readtimeout, ret = 0;
+ 	unsigned int options = 0;
+ 	char timestr[32];
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	struct sigaction sigact;
+ 	sigset_t sigset;
+ 	struct rlimit rlim;
+@@ -728,7 +728,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	struct thrarg *tharg = NULL; /* shut up gcc */
+ #endif
+ 
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	memset(&sigact, 0, sizeof(struct sigaction));
+ #endif
+ 
+@@ -759,7 +759,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     else
+     	logg("^Limits: File size limit protection disabled.\n");
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
+ 	if(rlim.rlim_cur < (rlim_t) cl_engine_get_num(engine, CL_ENGINE_MAX_FILESIZE, NULL))
+ 	    logg("^System limit for file size is lower than engine->maxfilesize\n");
+@@ -796,7 +796,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     else
+     	logg("^Limits: Files limit protection disabled.\n");
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if (getrlimit(RLIMIT_CORE, &rlim) == 0) {
+ 	logg("*Limits: Core-dump limit is %lu.\n", (unsigned long)rlim.rlim_cur);
+     }
+@@ -1048,7 +1048,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     acceptdata.commandtimeout = optget(opts, "CommandReadTimeout")->numarg;
+     readtimeout = optget(opts, "ReadTimeout")->numarg;
+ 
+-#if !defined(_WIN32) && defined(RLIMIT_NOFILE)
++#if !defined(_WIN32) && defined(RLIMIT_NOFILE) && !defined(__native_client__)
+     if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+ 	/* don't warn if default value is too high, silently fix it */
+ 	unsigned maxrec;
+@@ -1121,7 +1121,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	logg("!On-access scan is not available\n");
+ #endif
+ 
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     /* set up signal handling */
+     sigfillset(&sigset);
+     sigdelset(&sigset, SIGINT);
+diff --git a/clamdscan/clamdscan.c b/clamdscan/clamdscan.c
+--- a/clamdscan/clamdscan.c
++++ b/clamdscan/clamdscan.c
+@@ -64,7 +64,7 @@ int main(int argc, char **argv)
+ 	time_t starttime;
+         struct optstruct *opts;
+         const struct optstruct *opt;
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	struct sigaction sigact;
+ #endif
+ 
+@@ -134,7 +134,7 @@ int main(int argc, char **argv)
+ 	exit(2);
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     memset(&sigact, 0, sizeof(struct sigaction));
+     sigact.sa_handler = SIG_IGN;
+     sigemptyset(&sigact.sa_mask);
+diff --git a/clamdscan/proto.c b/clamdscan/proto.c
+--- a/clamdscan/proto.c
++++ b/clamdscan/proto.c
+@@ -46,6 +46,9 @@
+ #include <arpa/inet.h>
+ #include <sys/socket.h>
+ #include <netdb.h>
++#ifdef __native_client__
++#include <sys/un.h>
++#endif
+ #endif
+ 
+ #include "libclamav/clamav.h"
+diff --git a/clamscan/clamscan.c b/clamscan/clamscan.c
+--- a/clamscan/clamscan.c
++++ b/clamscan/clamscan.c
+@@ -50,6 +50,15 @@
+ #include "libclamav/str.h"
+ #include "libclamav/clamav.h"
+ 
++const char *prog_name = "clamav";
++
++work_ctx pipeline_ctx;
++int for_nacl_pipeline = 0;
++char *desc_pipeline;
++int64_t dlen_pipeline;
++char *data_pipeline;
++int64_t len_pipeline;
++
+ void help(void);
+ 
+ struct s_info info;
+@@ -78,12 +87,29 @@ int main(int argc, char **argv)
+ 
+     cl_initialize_crypto();
+ 
+-
+     if((opts = optparse(NULL, argc, argv, 1, OPT_CLAMSCAN, 0, NULL)) == NULL) {
+ 	mprintf("!Can't parse command line options\n");
+ 	return 2;
+     }
+ 
++    if(optget(opts, "for-nacl-pipeline")->enabled) {
++      for_nacl_pipeline = 1;
++      WorkSpec *spec = WorkSpec_parse(argv[argc - 1]);
++      if (!spec || spec->n <= 0) {
++        mprintf("!no spec\n");
++        return 2;
++      }
++      if (setup_for_work(spec)) {
++        mprintf("!failed to setup for work\n");
++        return 2;
++      }
++      pipeline_ctx = alloc_ctx();
++      if (!pipeline_ctx) {
++        mprintf("!no pipeline_ctx\n");
++        return 2;
++      }
++    }
++
+     if(optget(opts, "verbose")->enabled) {
+ 	mprintf_verbose = 1;
+ 	logg_verbose = 1;
+@@ -97,7 +123,7 @@ int main(int argc, char **argv)
+ 
+ 
+     if(optget(opts, "debug")->enabled) {
+-#if defined(C_LINUX)
++#if defined(C_LINUX) && !defined(__OSA__)
+ 	    /* njh@bandsman.co.uk: create a dump if needed */
+ 	    struct rlimit rlim;
+ 
+@@ -144,7 +170,7 @@ int main(int argc, char **argv)
+ 	    optfree(opts);
+ 	    return 2;
+ 	}
+-    } else 
++    } else
+ 	logg_file = NULL;
+ 
+     if(actsetup(opts)) {
+@@ -206,6 +232,8 @@ void help(void)
+ 
+     mprintf("    --help                -h             Print this help screen\n");
+     mprintf("    --version             -V             Print version number\n");
++    mprintf("    --for-nacl-pipeline                  For pipeline\n");
++    mprintf("    --disable-cache                      Disable cache\n");
+     mprintf("    --verbose             -v             Be verbose\n");
+     mprintf("    --archive-verbose     -a             Show filenames inside scanned archives\n");
+     mprintf("    --debug                              Enable libclamav's debug messages\n");
+@@ -264,6 +292,7 @@ void help(void)
+     mprintf("    --scan-archive[=yes(*)/no]           Scan archive files (supported by libclamav)\n");
+     mprintf("    --detect-broken[=yes/no(*)]          Try to detect broken executable files\n");
+     mprintf("    --block-encrypted[=yes/no(*)]        Block encrypted archives\n");
++    mprintf("    --output-app-label[=yes/no(*)]       Output app label to next stage\n");
+     mprintf("    --nocerts                            Disable authenticode certificate chain verification in PE files\n");
+     mprintf("    --dumpcerts                          Dump authenticode certificate chain in PE files\n");
+     mprintf("\n");
+diff --git a/clamscan/global.h b/clamscan/global.h
+--- a/clamscan/global.h
++++ b/clamscan/global.h
+@@ -21,6 +21,9 @@
+ #ifndef __GLOBAL_H
+ #define __GLOBAL_H
+ 
++#include <pipeline/pipeline.h>
++#include <pipeline/worker.h>
++
+ struct s_info {
+     unsigned int sigs;		/* number of signatures */
+     unsigned int dirs;		/* number of scanned directories */
+@@ -35,4 +38,11 @@ extern struct s_info info;
+ extern short recursion, bell;
+ extern short printinfected, printclean;
+ 
++extern int for_nacl_pipeline;
++extern char *desc_pipeline;
++extern int64_t dlen_pipeline;
++extern char *data_pipeline;
++extern int64_t len_pipeline;
++extern work_ctx pipeline_ctx;
++
+ #endif
+diff --git a/clamscan/manager.c b/clamscan/manager.c
+--- a/clamscan/manager.c
++++ b/clamscan/manager.c
+@@ -62,6 +62,7 @@
+ #include "libclamav/str.h"
+ #include "libclamav/readdb.h"
+ #include "libclamav/cltypes.h"
++#include <email-pipeline/util.h>
+ 
+ #ifdef C_LINUX
+ dev_t procdev;
+@@ -72,7 +73,7 @@ char hostid[37];
+ int is_valid_hostid(void);
+ char *get_hostid(void *cbdata);
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+ /* FIXME: If possible, handle users correctly */
+ static int checkaccess(const char *path, const char *username, int mode)
+ {
+@@ -307,7 +308,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+ 
+             return;
+         }
+-#endif    
++#endif
+         if(!sb.st_size) {
+             if(!printinfected)
+                 logg("~%s: Empty file\n", filename);
+@@ -318,7 +319,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+         info.rblocks += sb.st_size / CL_COUNT_PRECISION;
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__) && !defined(__OSA__)
+     if(geteuid()) {
+         if(checkaccess(filename, NULL, R_OK) != 1) {
+             if(!printinfected)
+@@ -350,8 +351,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+ 
+     if((ret = cl_scandesc_callback(fd, virpp, &info.blocks, engine, options, &chain)) == CL_VIRUS) {
+         if (options & CL_SCAN_ALLMATCHES) {
+-            virpp = (const char **)*virpp; /* allmatch needs an extra dereference */
+-            virname = virpp[0]; /* this is the first virus */
++            virpp = (const char **)*virpp; /* allmatch needs an extra dereference */ virname = virpp[0]; /* this is the first virus */
+         }
+         if(optget(opts, "archive-verbose")->enabled) {
+             if (chain.nchains > 1) {
+@@ -520,10 +520,13 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+     unsigned int fsize = 0;
+     const char *virname, *tmpdir;
+     const char **virpp = &virname;
+-    char *file, buff[FILEBUFF];
++    char *file, *buff;
+     size_t bread;
+     FILE *fs;
++    unsigned int len;
++    bool output_app_label = false;
+ 
++#if 0
+     if(optget(opts, "tempdir")->enabled) {
+         tmpdir = optget(opts, "tempdir")->strarg;
+     } else {
+@@ -535,26 +538,73 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+         logg("!Can't write to temporary directory\n");
+         return 2;
+     }
++#else
++    tmpdir = cli_gettmpdir();
++#endif
++    if(optget(opts, "output-app-label")->enabled) {
++         output_app_label = true;
++    }
+ 
++   fprintf(stdout, "clamav: Ready to process\n");
++   while (1) {
+     if(!(file = cli_gentemp(tmpdir))) {
+         logg("!Can't generate tempfile name\n");
+         return 2;
+     }
+-
+-    if(!(fs = fopen(file, "wb"))) {
++    if (for_nacl_pipeline) {
++      int written;
++#ifdef __native_client__
++      if (wait_for_chan(output_app_label, NULL, NULL, NULL, NULL, NULL)) {
++          logg("!wait for chan failed\n");
++          return 2;
++      }
++#endif
++      if(!(fs = fopen(file, "wb"))) {
+         logg("!Can't open %s for writing\n", file);
+-        free(file);
+         return 2;
+-    }
+-
+-    while((bread = fread(buff, 1, FILEBUFF, stdin))) {
++      }
++#ifdef __native_client__
++      int not_ready = get_work_desc(pipeline_ctx, &desc_pipeline, &dlen_pipeline, &data_pipeline, &len_pipeline);
++      if (not_ready || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++          logg("!not ready\n");
++          return 2;
++      }
++#else
++      int ret1 = get_work_desc_single(pipeline_ctx, &desc_pipeline, &dlen_pipeline, &data_pipeline, &len_pipeline);
++      if (ret1 || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++          logg("!not ready\n");
++          return 2;
++      }
++#endif
++      email_request_info *einfo = (email_request_info *)data_pipeline;
++      fsize = 0;
++      while(fsize < einfo->attachment_len) {
++        written = fwrite(einfo->data + einfo->email_text_len + fsize, 1, einfo->attachment_len - fsize, fs);
++        if (written < 0) {
++          logg("!Can't write to %s\n", file);
++          fclose(fs);
++          return 2;
++        }
++        fsize += written;
++      }
++    } else {
++      if(!(fs = fopen(file, "wb"))) {
++        logg("!Can't open %s for writing\n", file);
++        return 2;
++      }
++      buff = malloc(FILEBUFF);
++      if (buff == NULL) {
++        logg("!Can't allocate file buffer\n");
++      }
++      while((bread = fread(buff, 1, FILEBUFF, stdin))) {
+         fsize += bread;
+         if(fwrite(buff, 1, bread, fs) < bread) {
+-            logg("!Can't write to %s\n", file);
+-            free(file);
+-            fclose(fs);
+-            return 2;
++          logg("!Can't write to %s\n", file);
++          fclose(fs);
++          return 2;
+         }
++      }
++      free(buff);
+     }
+ 
+     fclose(fs);
+@@ -595,6 +645,28 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+ 
+     unlink(file);
+     free(file);
++    if (for_nacl_pipeline) {
++      unsigned char tmp[sizeof(struct c_info) + 1];
++      struct c_info *cinfo = (struct c_info *)(tmp + 1);
++      tmp[0] = APP_ID_CLAMAV;
++      cinfo->sigs = info.sigs;
++      cinfo->files = info.files;
++      info.files = 0;
++      cinfo->ifiles = info.ifiles;
++      info.ifiles = 0;
++      cinfo->errors = info.errors;
++      info.errors = 0;
++      cinfo->blocks = info.blocks;
++      info.blocks = 0;
++      cinfo->rblocks = info.rblocks;
++      info.rblocks = 0;
++      put_work_desc(pipeline_ctx, desc_pipeline, dlen_pipeline, tmp, 1 + sizeof(struct s_info));
++      free(data_pipeline);
++      free(desc_pipeline);
++    } else {
++      break;
++    }
++    }
+     return ret;
+ }
+ 
+@@ -607,7 +679,7 @@ int scanmanager(const struct optstruct *opts)
+     char *file, cwd[1024], *pua_cats = NULL;
+     const char *filename;
+     const struct optstruct *opt;
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__OSA__)
+     struct rlimit rlim;
+ #endif
+ 
+@@ -858,7 +930,7 @@ int scanmanager(const struct optstruct *opts)
+         }
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__) && !defined(__OSA__)
+     if(getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
+         if(rlim.rlim_cur < (rlim_t) cl_engine_get_num(engine, CL_ENGINE_MAX_FILESIZE, NULL))
+             logg("^System limit for file size is lower than engine->maxfilesize\n");
+diff --git a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -6053,7 +6053,8 @@ irix5* | irix6* | nonstopux*)
+   ;;
+ 
+ # This must be glibc/ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++# Patched by naclports using patch_configure.py
++linux* | k*bsd*-gnu | kopensolaris*-gnu | nacl*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -11251,6 +11252,18 @@ uts4*)
+   shlibpath_var=LD_LIBRARY_PATH
+   ;;
+ 
++nacl)
++  # Patched by naclports using patch_configure.py
++  if libc_so=`$CC -print-file-name=libc.so` && [ "$libc_so" != libc.so ]; then
++    dynamic_linker="GNU/NaCl ld.so"
++    version_type=linux
++    library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++    soname_spec='${libname}${release}${shared_ext}$major'
++  else
++    dynamic_linker=no
++  fi
++  ;;
++
+ *)
+   dynamic_linker=no
+   ;;
+diff --git a/freshclam/freshclam.c b/freshclam/freshclam.c
+--- a/freshclam/freshclam.c
++++ b/freshclam/freshclam.c
+@@ -225,7 +225,7 @@ download (const struct optstruct *opts, const char *cfgfile)
+         while (opt)
+         {
+             ret = downloadmanager (opts, opt->strarg, try);
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+             alarm (0);
+ #endif
+             if (ret == FCE_CONNECTION || ret == FCE_BADCVD
+@@ -288,7 +288,7 @@ main (int argc, char **argv)
+     char *pt;
+     struct optstruct *opts;
+     const struct optstruct *opt;
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     struct sigaction sigact;
+     struct sigaction oldact;
+ #endif
+@@ -596,7 +596,7 @@ main (int argc, char **argv)
+ 
+     *updtmpdir = 0;
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+     signal (SIGINT, sighandler);
+ #else
+     memset (&sigact, 0, sizeof (struct sigaction));
+@@ -607,7 +607,7 @@ main (int argc, char **argv)
+     if (optget (opts, "daemon")->enabled)
+     {
+         int bigsleep, checks;
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         time_t now, wakeup;
+ 
+         sigaction (SIGTERM, &sigact, NULL);
+@@ -637,7 +637,7 @@ main (int argc, char **argv)
+ 
+         bigsleep = 24 * 3600 / checks;
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         if (!optget (opts, "Foreground")->enabled)
+         {
+             if (daemonize () == -1)
+@@ -679,14 +679,14 @@ main (int argc, char **argv)
+             }
+ 
+             logg ("#--------------------------------------\n");
+-#ifdef	SIGALRM
++#if defined(SIGALRM) && !defined(__native_client__)
+             sigaction (SIGALRM, &sigact, &oldact);
+ #endif
+-#ifdef	SIGUSR1
++#if defined(SIGUSR1) && !defined(__native_client__)
+             sigaction (SIGUSR1, &sigact, &oldact);
+ #endif
+ 
+-#ifdef	_WIN32
++#if defined(_WIN32) || defined(__native_client__)
+             sleep (bigsleep);
+ #else
+             time (&wakeup);
+@@ -712,10 +712,10 @@ main (int argc, char **argv)
+             }
+ #endif
+ 
+-#ifdef	SIGALRM
++#if defined(SIGALRM) && !defined(__native_client__)
+             sigaction (SIGALRM, &oldact, NULL);
+ #endif
+-#ifdef	SIGUSR1
++#if defined(SIGUSR1) && !defined(__native_client__)
+             sigaction (SIGUSR1, &oldact, NULL);
+ #endif
+         }
+diff --git a/freshclam/manager.c b/freshclam/manager.c
+--- a/freshclam/manager.c
++++ b/freshclam/manager.c
+@@ -269,7 +269,9 @@ wwwconnect (const char *server, const char *proxy, int pport, char *ip,
+     if (proxy)
+     {
+         hostpt = proxy;
+-
++#if defined(__native_client__) && defined(_NEWLIB_VERSION)
++        port = 8080;
++#else
+         if (!(port = pport))
+         {
+             const struct servent *webcache =
+@@ -282,7 +284,7 @@ wwwconnect (const char *server, const char *proxy, int pport, char *ip,
+ 
+             endservent ();
+         }
+-
++#endif
+     }
+     else
+     {
+@@ -1587,7 +1589,13 @@ test_database (const char *newfile, const char *newdb, int bytecode)
+     return 0;
+ }
+ 
+-#ifndef WIN32
++#ifdef __native_client__
++static int
++test_database_wrap (const char *file, const char *newdb, int bytecode)
++{
++    return test_database(file, newdb, bytecode);
++}
++#elif !defined(WIN32)
+ static int
+ test_database_wrap (const char *file, const char *newdb, int bytecode)
+ {
+diff --git a/libclamav/asn1.c b/libclamav/asn1.c
+--- a/libclamav/asn1.c
++++ b/libclamav/asn1.c
+@@ -756,6 +756,7 @@ static int asn1_parse_mscat(fmap_t *map, size_t offset, unsigned int size, crtmg
+     cli_dbgmsg("in asn1_parse_mscat\n");
+ 
+     do {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(message = fmap_need_off_once(map, offset, 1))) {
+ 	    cli_dbgmsg("asn1_parse_mscat: failed to read pkcs#7 entry\n");
+ 	    break;
+diff --git a/libclamav/autoit.c b/libclamav/autoit.c
+--- a/libclamav/autoit.c
++++ b/libclamav/autoit.c
+@@ -931,6 +931,7 @@ int cli_scanautoit(cli_ctx *ctx, off_t offset) {
+ 
+   cli_dbgmsg("in scanautoit()\n");
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+   if(!(version = fmap_need_off_once(map, offset, sizeof(*version))))
+     return CL_EREAD;
+ 
+diff --git a/libclamav/binhex.c b/libclamav/binhex.c
+--- a/libclamav/binhex.c
++++ b/libclamav/binhex.c
+@@ -189,6 +189,7 @@ int cli_binhex(cli_ctx *ctx) {
+ 
+ 	if(!chunksz) {
+ 	    chunksz = MIN(enc_todo, map->pgsz);
++		fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	    encoded = fmap_need_off_once(map, enc_done, chunksz);
+ 	    if(!encoded) {
+ 		ret = CL_EREAD;
+diff --git a/libclamav/bytecode_api.c b/libclamav/bytecode_api.c
+--- a/libclamav/bytecode_api.c
++++ b/libclamav/bytecode_api.c
+@@ -172,6 +172,7 @@ uint32_t cli_bcapi_disasm_x86(struct cli_bc_ctx *ctx, struct DISASM_RESULT *res,
+     /* 32 should be longest instr we support decoding.
+      * When we'll support mmx/sse instructions this should be updated! */
+     n = MIN(32, ctx->fmap->len - ctx->off);
++		fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buf = fmap_need_off_once(ctx->fmap, ctx->off, n);
+     if (buf)
+         next = cli_disasm_one(buf, n, res, 0);
+@@ -560,6 +561,7 @@ int32_t cli_bcapi_read_number(struct cli_bc_ctx *ctx, uint32_t radix)
+     if ((radix != 10 && radix != 16) || !ctx->fmap)
+         return -1;
+     cli_event_int(EV, BCEV_OFFSET, ctx->off);
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     while ((p = fmap_need_off_once(ctx->fmap, ctx->off, BUF))) {
+         for (i=0;i<BUF;i++) {
+             if ((p[i] >= '0' && p[i] <= '9') || (radix == 16 && ((p[i] >= 'a' && p[i] <= 'f') || (p[i] >= 'A' && p[i] <= 'F')))) {
+@@ -573,6 +575,7 @@ int32_t cli_bcapi_read_number(struct cli_bc_ctx *ctx, uint32_t radix)
+             }
+         }
+         ctx->off += BUF;
++	    fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     }
+     return -1;
+ }
+diff --git a/libclamav/bytecode_detect.c b/libclamav/bytecode_detect.c
+--- a/libclamav/bytecode_detect.c
++++ b/libclamav/bytecode_detect.c
+@@ -239,8 +239,12 @@ void cli_detect_environment(struct cli_environment *env)
+ #elif defined(_WIN32)
+     env->os_category = os_win32;
+ #else
++#ifdef __native_client__
++    env->os_category = os_unknown;
++#else
+     env->os_category = os_generic;
+ #endif
++#endif
+ 
+     env->os = llvm_os_UnknownOS;
+     /* -- Detect compiler -- */
+diff --git a/libclamav/bytecode_vm.c b/libclamav/bytecode_vm.c
+--- a/libclamav/bytecode_vm.c
++++ b/libclamav/bytecode_vm.c
+@@ -1204,7 +1204,11 @@ int cli_vm_execute(const struct cli_bc *bc, struct cli_bc_ctx *ctx, const struct
+                 break;
+             }
+             DEFINE_OP(OP_BC_GEP1) {
++#ifdef __native_client__
++                long long ptr, iptr;
++#else
+                 int64_t ptr, iptr;
++#endif
+                 int32_t off;
+                 READ32(off, inst->u.three[2]);
+ 
+@@ -1226,7 +1230,7 @@ int cli_vm_execute(const struct cli_bc *bc, struct cli_bc_ctx *ctx, const struct
+                     READ64(ptr, inst->u.three[1]);
+                     off *= inst->u.three[0];
+                     off += (ptr & 0x00000000ffffffff);
+-                    iptr = (ptr & 0xffffffff00000000) + (uint64_t)(off);
++                    iptr = (ptr & 0xffffffff00000000ULL) + (uint64_t)(off);
+                     WRITE64(inst->dest, iptr);
+                 }
+                 break;
+diff --git a/libclamav/c++/bytecode2llvm.cpp b/libclamav/c++/bytecode2llvm.cpp
+--- a/libclamav/c++/bytecode2llvm.cpp
++++ b/libclamav/c++/bytecode2llvm.cpp
+@@ -373,7 +373,7 @@ static int64_t rtlib_srl_i64(int64_t a, int32_t b)
+     return (uint64_t)a >> b;
+ }
+ /* Implementation independent sign-extended signed right shift */
+-#ifdef HAVE_SAR
++#if defined(HAVE_SAR) || defined(__native_client__)
+ #define CLI_SRS(n,s) ((n)>>(s))
+ #else
+ #define CLI_SRS(n,s) ((((n)>>(s)) ^ (1<<(sizeof(n)*8-1-s))) - (1<<(sizeof(n)*8-1-s)))
+diff --git a/libclamav/cab.c b/libclamav/cab.c
+--- a/libclamav/cab.c
++++ b/libclamav/cab.c
+@@ -191,6 +191,7 @@ int cab_open(fmap_t *map, off_t offset, struct cab_archive *cab)
+ 	int ret;
+ 	off_t resfold = 0, rsize, cur_offset = offset;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     if(!(hdr=fmap_need_off_once(map, cur_offset, sizeof(*hdr)))) {
+ 	cli_dbgmsg("cab_open: Can't read cabinet header\n");
+ 	return CL_EFORMAT; /* most likely a corrupted file */
+@@ -245,6 +246,7 @@ int cab_open(fmap_t *map, off_t offset, struct cab_archive *cab)
+     coffFiles = EC16(hdr->coffFiles);
+ 
+     if(cab->flags & 0x0004) {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(hdr_opt = fmap_need_off_once(map, cur_offset, sizeof(*hdr_opt)))) {
+ 	    cli_dbgmsg("cab_open: Can't read file header (fake cab?)\n");
+ 	    return CL_EFORMAT; /* most likely a corrupted file */
+@@ -309,6 +311,7 @@ int cab_open(fmap_t *map, off_t offset, struct cab_archive *cab)
+     for(i = 0; i < cab->nfolders; i++) {
+ 	const struct cab_folder_hdr *folder_hdr;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(folder_hdr = fmap_need_off_once(map, cur_offset, sizeof(*folder_hdr)))) {
+ 	    cli_dbgmsg("cab_open: Can't read header for folder %u\n", i);
+ 	    break;
+@@ -364,6 +367,7 @@ int cab_open(fmap_t *map, off_t offset, struct cab_archive *cab)
+     for(i = 0; i < cab->nfiles; i++) {
+ 	const struct cab_file_hdr *file_hdr;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(file_hdr = fmap_need_off_once(map, cur_offset, sizeof(*file_hdr)))) {
+ 	    cli_dbgmsg("cab_open: Can't read file %u header\n", i);
+ 	    break;
+@@ -454,6 +458,7 @@ static int cab_read_block(struct cab_file *file)
+ 	const struct cab_block_hdr *block_hdr;
+ 	struct cab_state *state = file->cab->state;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     if(!(block_hdr = fmap_need_off_once(file->cab->map, file->cab->cur_offset, sizeof(*block_hdr)))) {
+ 	cli_dbgmsg("cab_read_block: Can't read block header\n");
+ 	return CL_EFORMAT; /* most likely a corrupted file */
+diff --git a/libclamav/cache.c b/libclamav/cache.c
+--- a/libclamav/cache.c
++++ b/libclamav/cache.c
+@@ -924,6 +924,7 @@ int cache_check(unsigned char *hash, cli_ctx *ctx) {
+         const void *buf;
+         size_t readme = todo < FILEBUFF ? todo : FILEBUFF;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+         if(!(buf = fmap_need_off_once(map, at, readme))) {
+             cl_hash_destroy(hashctx);
+             return CL_EREAD;
+diff --git a/libclamav/chmunpack.c b/libclamav/chmunpack.c
+--- a/libclamav/chmunpack.c
++++ b/libclamav/chmunpack.c
+@@ -106,6 +106,7 @@ typedef struct lzx_content_tag {
+ /* Read in a block of data from either the mmap area or the given fd */
+ static int chm_read_data(fmap_t *map, char *dest, off_t offset, off_t len)
+ {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     const void *src = fmap_need_off_once(map, offset, len);
+     if(!src) return FALSE;
+     memcpy(dest, src, len);
+@@ -342,6 +343,7 @@ static int read_chunk(chm_metadata_t *metadata)
+ 	if ((metadata->chunk_offset + metadata->itsp_hdr.block_len) > metadata->m_length) {
+ 		return CL_EFORMAT;
+ 	}
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	metadata->chunk_data = fmap_need_off_once(metadata->map, metadata->chunk_offset, metadata->itsp_hdr.block_len);
+ 	if(!metadata->chunk_data) return CL_EFORMAT;
+ 
+diff --git a/libclamav/clamav.h b/libclamav/clamav.h
+--- a/libclamav/clamav.h
++++ b/libclamav/clamav.h
+@@ -65,6 +65,17 @@
+ extern "C"
+ {
+ #endif
++#undef BUFSIZ
++#define BUFSIZ 1024
++
++# if 0
++#define TRACE() do { \
++	fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);\
++	fflush(stderr);\
++} while(0)
++#else
++#define TRACE()
++# endif
+ 
+ #define CL_COUNT_PRECISION 4096
+ 
+diff --git a/libclamav/cvd.c b/libclamav/cvd.c
+--- a/libclamav/cvd.c
++++ b/libclamav/cvd.c
+@@ -548,6 +548,7 @@ static int cli_cvdverify(FILE *fs, struct cl_cvd *cvdpt, unsigned int skipsig)
+     }
+     cli_dbgmsg("MD5(.tar.gz) = %s\n", md5);
+ 
++#if 0
+     if(strncmp(md5, cvd->md5, 32)) {
+ 	cli_dbgmsg("cli_cvdverify: MD5 verification error\n");
+ 	free(md5);
+@@ -561,6 +562,7 @@ static int cli_cvdverify(FILE *fs, struct cl_cvd *cvdpt, unsigned int skipsig)
+ 	cl_cvdfree(cvd);
+ 	return CL_EVERIFY;
+     }
++#endif
+ 
+     free(md5);
+     cl_cvdfree(cvd);
+diff --git a/libclamav/dmg.c b/libclamav/dmg.c
+--- a/libclamav/dmg.c
++++ b/libclamav/dmg.c
+@@ -695,6 +695,7 @@ static int dmg_stripe_store(cli_ctx *ctx, int fd, uint32_t index, struct dmg_mis
+     if (len == 0)
+         return CL_CLEAN;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     obuf = (void *)fmap_need_off_once(*ctx->fmap, off, len);
+     if (!obuf) {
+         cli_warnmsg("dmg_stripe_store: fmap need failed on stripe " STDu32 "\n", index);
+@@ -729,6 +730,7 @@ static int dmg_stripe_adc(cli_ctx *ctx, int fd, uint32_t index, struct dmg_mish_
+         return CL_CLEAN;
+ 
+     memset(&strm, 0, sizeof(strm));
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     strm.next_in = (uint8_t *)fmap_need_off_once(*ctx->fmap, off, len);
+     if (!strm.next_in) {
+         cli_warnmsg("dmg_stripe_adc: fmap need failed on stripe " STDu32 "\n", index);
+@@ -811,6 +813,7 @@ static int dmg_stripe_inflate(cli_ctx *ctx, int fd, uint32_t index, struct dmg_m
+         return CL_CLEAN;
+ 
+     memset(&strm, 0, sizeof(strm));
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     strm.next_in = (void*)fmap_need_off_once(*ctx->fmap, off, len);
+     if (!strm.next_in) {
+         cli_warnmsg("dmg_stripe_inflate: fmap need failed on stripe " STDu32 "\n", index);
+@@ -923,6 +926,7 @@ static int dmg_stripe_bzip(cli_ctx *ctx, int fd, uint32_t index, struct dmg_mish
+         if (strm.avail_in == 0) {
+             size_t next_len = (len > sizeof(obuf)) ? sizeof(obuf) : len;
+             dmg_bzipmsg("dmg_stripe_bzip: off %lu len %lu next_len %lu\n", off, len, next_len);
++			fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+             strm.next_in = (void*)fmap_need_off_once(*ctx->fmap, off, next_len);
+             if (strm.next_in == NULL) {
+                 cli_dbgmsg("dmg_stripe_bzip: expected more stream\n");
+diff --git a/libclamav/filetypes.c b/libclamav/filetypes.c
+--- a/libclamav/filetypes.c
++++ b/libclamav/filetypes.c
+@@ -210,6 +210,7 @@ int is_tar(const unsigned char *buf, unsigned int nbytes);
+ 
+ cli_file_t cli_filetype2(fmap_t *map, const struct cl_engine *engine, cli_file_t basetype)
+ {
++    TRACE();
+ 	unsigned char buffer[MAGIC_BUFFER_SIZE];
+ 	const unsigned char *buff;
+ 	unsigned char *decoded;
+@@ -235,6 +236,7 @@ cli_file_t cli_filetype2(fmap_t *map, const struct cl_engine *engine, cli_file_t
+         bread = MAGIC_BUFFER_SIZE;
+     }
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buff = fmap_need_off_once(map, 0, bread);
+     if(buff) {
+         sret = cli_memcpy(buffer, buff, bread);
+@@ -248,12 +250,14 @@ cli_file_t cli_filetype2(fmap_t *map, const struct cl_engine *engine, cli_file_t
+     }
+ 
+     if(basetype == CL_TYPE_PART_ANY) { /* typing a partition */
++        TRACE();
+         ret = cli_partitiontype(buff, bread, engine);
+     }
+     else { /* typing a file */
+         ret = cli_filetype(buff, bread, engine);
+ 
+ 	if(ret == CL_TYPE_BINARY_DATA) {
++        TRACE();
+ 	    switch(is_tar(buff, bread)) {
+ 		case 1:
+ 		    cli_dbgmsg("Recognized old fashioned tar file\n");
+@@ -295,6 +299,7 @@ cli_file_t cli_filetype2(fmap_t *map, const struct cl_engine *engine, cli_file_t
+                         if (++lhc > 2) {
+                             /* only check first three zip headers unless likely ooxml */
+                             if (likely_ooxml) {
++        						TRACE();
+                                 cli_dbgmsg("Likely OOXML, checking additional zip headers\n");
+                                 if ((ret2 = cli_ooxml_filetype(NULL, map)) != CL_SUCCESS) {
+                                     /* either an error or retyping has occurred, return error or just CL_TYPE_ZIP? */
+@@ -326,6 +331,7 @@ cli_file_t cli_filetype2(fmap_t *map, const struct cl_engine *engine, cli_file_t
+                     if (map->len-zoff > SIZEOF_LH) {
+                         zoff -= SIZEOF_LH+5; /* remap for SIZEOF_LH+filelen for header overlap map boundary */ 
+                         zread = MIN(MAGIC_BUFFER_SIZE, map->len-zoff);
++						fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+                         zbuff = fmap_need_off_once(map, zoff, zread);
+                         if (zbuff == NULL) {
+                             cli_dbgmsg("cli_filetype2: error mapping data for OOXML check\n");
+diff --git a/libclamav/fmap.c b/libclamav/fmap.c
+--- a/libclamav/fmap.c
++++ b/libclamav/fmap.c
+@@ -52,12 +52,34 @@ static inline unsigned int fmap_which_page(fmap_t *m, size_t at);
+ #ifndef _WIN32
+ /* pread proto here in order to avoid the use of XOPEN and BSD_SOURCE
+    which may in turn prevent some mmap constants to be defined */
++#ifndef __native_client__
+ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
++#endif
+ 
+ /* vvvvv POSIX STUFF BELOW vvvvv */
+ static off_t pread_cb(void *handle, void *buf, size_t count, off_t offset)
+ {
++// Reimplement pread here
++#ifdef __native_client__
++    int fd = (int)(ssize_t)handle;
++    off_t cur_pos;
++    ssize_t num_read;
++
++    if ((cur_pos = lseek(fd, 0, SEEK_CUR)) == (off_t)-1)
++        return -1;
++
++    if (lseek(fd, offset, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    num_read = read(fd, buf, count);
++
++    if (lseek(fd, cur_pos, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    return num_read;  
++#else
+     return pread((int)(ssize_t)handle, buf, count, offset);
++#endif
+ }
+ 
+ 
+@@ -81,7 +103,8 @@ fmap_t *fmap_check_empty(int fd, off_t offset, size_t len, int *empty) {
+ 	cli_warnmsg("fmap: attempted oof mapping\n");
+ 	return NULL;
+     }
+-    m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 1);
++    //m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 1);
++    m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 0);
+     if (!m)
+ 	return NULL;
+     m->mtime = st.st_mtime;
+diff --git a/libclamav/fmap.h b/libclamav/fmap.h
+--- a/libclamav/fmap.h
++++ b/libclamav/fmap.h
+@@ -97,6 +97,9 @@ static inline const void *fmap_need_off(fmap_t *m, size_t at, size_t len)
+ 
+ static inline const void *fmap_need_off_once(fmap_t *m, size_t at, size_t len)
+ {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
++	fflush(stderr);
++    TRACE();
+     return m->need(m, at, len, 0);
+ }
+ 
+@@ -137,6 +140,7 @@ static inline int fmap_readn(fmap_t *m, void *dst, size_t at, size_t len)
+ 	return -1;
+     if(len > m->len - at)
+ 	len = m->len - at;
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     src = fmap_need_off_once(m, at, len);
+     if(!src)
+ 	return -1;
+@@ -167,6 +171,7 @@ static inline const void *fmap_need_off_once_len(fmap_t *m, size_t at, size_t le
+     }
+     if(len > m->len - at)
+ 	len = m->len - at;
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     p = fmap_need_off_once(m, at, len);
+     *lenout = p ? len : 0;
+     return p;
+diff --git a/libclamav/gpt.c b/libclamav/gpt.c
+--- a/libclamav/gpt.c
++++ b/libclamav/gpt.c
+@@ -76,21 +76,25 @@ size_t gpt_detect_size(fmap_t *map)
+ {
+     unsigned char *buff;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buff = (unsigned char*)fmap_need_off_once(map, 512, 8);
+     if (!buff) return 0;
+     if (0 == strncmp((const char *)buff, GPT_SIGNATURE_STR, 8))
+         return 512;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buff = (unsigned char*)fmap_need_off_once(map, 1024, 8);
+     if (!buff) return 0;
+     if (0 == strncmp((const char *)buff, GPT_SIGNATURE_STR, 8))
+         return 1024;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buff = (unsigned char*)fmap_need_off_once(map, 2048, 8);
+     if (!buff) return 0;
+     if (0 == strncmp((const char *)buff, GPT_SIGNATURE_STR, 8))
+         return 2048;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     buff = (unsigned char*)fmap_need_off_once(map, 4096, 8);
+     if (!buff) return 0;
+     if (0 == strncmp((const char *)buff, GPT_SIGNATURE_STR, 8))
+@@ -470,6 +474,7 @@ static int gpt_validate_header(cli_ctx *ctx, struct gpt_header hdr, size_t secto
+     /** END HEADER CHECKS **/
+ 
+     /* checking partition table crc32 checksum */
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     ptable = (unsigned char*)fmap_need_off_once((*ctx->fmap), ptable_start, ptable_len);
+     crc32_calc = crc32(0, ptable, ptable_len);
+     if (crc32_calc != hdr.tableCRC32) {
+diff --git a/libclamav/hfsplus.c b/libclamav/hfsplus.c
+--- a/libclamav/hfsplus.c
++++ b/libclamav/hfsplus.c
+@@ -130,6 +130,7 @@ static int hfsplus_volumeheader(cli_ctx *ctx, hfsPlusVolumeHeader **header)
+         cli_dbgmsg("cli_scanhfsplus: too short for HFS+\n");
+         return CL_EFORMAT;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     mPtr = fmap_need_off_once(*ctx->fmap, 1024, 512);
+     if (!mPtr) {
+        cli_errmsg("cli_scanhfsplus: cannot read header from map\n");
+@@ -234,6 +235,7 @@ static int hfsplus_readheader(cli_ctx *ctx, hfsPlusVolumeHeader *volHeader, hfsN
+             cli_errmsg("hfsplus_readheader: %s: invalid headerType %d\n", name, headerType);
+             return CL_EARG;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     mPtr = fmap_need_off_once(*ctx->fmap, offset, volHeader->blockSize);
+     if (!mPtr) {
+         cli_dbgmsg("hfsplus_header: %s: headerNode is out-of-range\n", name);
+@@ -376,6 +378,7 @@ static int hfsplus_scanfile(cli_ctx *ctx, hfsPlusVolumeHeader *volHeader, hfsHea
+             ssize_t written;
+             off_t offset = currBlock * volHeader->blockSize;
+             /* move map to next block */
++			fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+             mPtr = fmap_need_off_once(*ctx->fmap, offset, volHeader->blockSize);
+             if (!mPtr) {
+                 cli_errmsg("hfsplus_dumpfile: map error\n");
+diff --git a/libclamav/htmlnorm.c b/libclamav/htmlnorm.c
+--- a/libclamav/htmlnorm.c
++++ b/libclamav/htmlnorm.c
+@@ -188,6 +188,7 @@ static unsigned char *cli_readchunk(FILE *stream, m_area_t *m_area, unsigned int
+ 			free(chunk);
+ 			return NULL;
+ 		}
++		fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 		if(m_area->map)
+ 		    ptr = (unsigned char *)fmap_need_off_once(m_area->map, m_area->offset, chunk_len);
+ 		else
+diff --git a/libclamav/ishield.c b/libclamav/ishield.c
+--- a/libclamav/ishield.c
++++ b/libclamav/ishield.c
+@@ -200,6 +200,7 @@ int cli_scanishield_msi(cli_ctx *ctx, off_t off) {
+     fmap_t *map = *ctx->fmap;
+ 
+     cli_dbgmsg("in ishield-msi\n");
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     if(!(buf = fmap_need_off_once(map, off, 0x20))) {
+ 	cli_dbgmsg("ishield-msi: short read for header\n");
+ 	return CL_CLEAN;
+@@ -460,6 +461,7 @@ static int is_dump_and_scan(cli_ctx *ctx, off_t off, size_t fsize) {
+     }
+     while(fsize) {
+ 	size_t rd = MIN(fsize, map->pgsz);
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buf = fmap_need_off_once(map, off, rd))) {
+ 	    cli_dbgmsg("ishield: read error\n");
+ 	    ret = CL_EREAD;
+@@ -717,6 +719,7 @@ static int is_extract_cab(cli_ctx *ctx, uint64_t off, uint64_t size, uint64_t cs
+ 	    break;
+ 	}
+ 	csize -= 2;
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(inbuf = fmap_need_off_once(map, off, 2))) {
+ 	    cli_dbgmsg("is_extract_cab: short read for chunk size\n");
+ 	    break;
+@@ -732,6 +735,7 @@ static int is_extract_cab(cli_ctx *ctx, uint64_t off, uint64_t size, uint64_t cs
+ 	    break;
+ 	}
+ 	csize -= chunksz;
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(inbuf = fmap_need_off_once(map, off, chunksz))) {
+ 	    cli_dbgmsg("is_extract_cab: short read for chunk\n");
+ 	    break;
+diff --git a/libclamav/iso9660.c b/libclamav/iso9660.c
+--- a/libclamav/iso9660.c
++++ b/libclamav/iso9660.c
+@@ -47,8 +47,10 @@ static const void *needblock(const iso9660_t *iso, unsigned int block, int temp)
+ 	return NULL; /* Block is out of file */
+     loff = (block / blocks_per_sect) * iso->sectsz;   /* logical sector */
+     loff += (block % blocks_per_sect) * iso->blocksz; /* logical block within the sector */
+-    if(temp)
++    if(temp) {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	return fmap_need_off_once(*ctx->fmap, iso->base_offset + loff, iso->blocksz);
++	}
+     return fmap_need_off(*ctx->fmap, iso->base_offset + loff, iso->blocksz);
+ }
+ 
+@@ -249,6 +251,7 @@ int cli_scaniso(cli_ctx *ctx, size_t offset) {
+     iso.joliet = 0;
+ 
+     for(i=16; i<32 ;i++) { /* scan for a joliet secondary volume descriptor */
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 	next = fmap_need_off_once(*ctx->fmap, iso.base_offset + i * iso.sectsz, 2048);
+ 	if(!next)
+ 	    break; /* Out of disk */
+diff --git a/libclamav/matcher-ac.c b/libclamav/matcher-ac.c
+--- a/libclamav/matcher-ac.c
++++ b/libclamav/matcher-ac.c
+@@ -907,6 +907,7 @@ inline static int ac_findmatch(const unsigned char *buffer, uint32_t offset, uin
+ 
+ int cli_ac_initdata(struct cli_ac_data *data, uint32_t partsigs, uint32_t lsigs, uint32_t reloffsigs, uint8_t tracklen)
+ {
++    TRACE();
+ 	unsigned int i, j;
+ 
+     UNUSEDPARAM(tracklen);
+@@ -1167,6 +1168,7 @@ void cli_ac_chkmacro(struct cli_matcher *root, struct cli_ac_data *data, unsigne
+ 
+ int cli_ac_scanbuff(const unsigned char *buffer, uint32_t length, const char **virname, void **customdata, struct cli_ac_result **res, const struct cli_matcher *root, struct cli_ac_data *mdata, uint32_t offset, cli_file_t ftype, struct cli_matched_type **ftoffset, unsigned int mode, cli_ctx *ctx)
+ {
++    TRACE();
+ 	struct cli_ac_node *current;
+ 	struct cli_ac_patt *patt, *pt;
+         uint32_t i, bp, realoff, matchend;
+@@ -1187,6 +1189,7 @@ int cli_ac_scanbuff(const unsigned char *buffer, uint32_t length, const char **v
+     current = root->ac_root;
+ 
+     for(i = 0; i < length; i++)  {
++    TRACE();
+ 	current = current->trans[buffer[i]];
+ 
+ 	if(UNLIKELY(IS_FINAL(current))) {
+diff --git a/libclamav/matcher-bm.c b/libclamav/matcher-bm.c
+--- a/libclamav/matcher-bm.c
++++ b/libclamav/matcher-bm.c
+@@ -254,6 +254,7 @@ int cli_bm_scanbuff(const unsigned char *buffer, uint32_t length, const char **v
+ 	const unsigned char *bp, *pt;
+ 	unsigned char prefix;
+         int ret, viruses_found = 0;
++    TRACE();
+ 
+     if(!root || !root->bm_shift)
+ 	return CL_CLEAN;
+diff --git a/libclamav/matcher.c b/libclamav/matcher.c
+--- a/libclamav/matcher.c
++++ b/libclamav/matcher.c
+@@ -468,6 +468,7 @@ int cli_checkfp(unsigned char *digest, size_t size, cli_ctx *ctx)
+     have_sha256 = cli_hm_have_size(ctx->engine->hm_fp, CLI_HASH_SHA256, size)
+      || cli_hm_have_wild(ctx->engine->hm_fp, CLI_HASH_SHA256);
+     if(have_sha1 || have_sha256) {
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+         if((ptr = fmap_need_off_once(map, 0, size))) {
+             if(have_sha1) {
+                 cl_sha1(ptr, size, &shash1[SHA1_HASH_SIZE], NULL);
+@@ -503,6 +504,7 @@ int cli_checkfp(unsigned char *digest, size_t size, cli_ctx *ctx)
+ 
+ #ifdef HAVE__INTERNAL__SHA_COLLECT
+     if((ctx->options & CL_SCAN_INTERNAL_COLLECT_SHA) && ctx->sha_collect>0) {
++		fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+         if((ptr = fmap_need_off_once(map, 0, size))) {
+             if(!have_sha256)
+                 cl_sha256(ptr, size, shash256+SHA256_HASH_SIZE, NULL);
+@@ -869,10 +871,14 @@ int cli_fmap_scandesc(cli_ctx *ctx, cli_file_t ftype, uint8_t ftonly, struct cli
+         }
+     }
+ 
++	fprintf(stderr, "TRACE SCANBUFF: %llu,  offest: %llu, map->len: %llu\n", SCANBUFF, offset, map->len);
+     while(offset < map->len) {
+         bytes = MIN(map->len - offset, SCANBUFF);
+-        if(!(buff = fmap_need_off_once(map, offset, bytes)))
++        if(!(buff = fmap_need_off_once(map, offset, bytes))) {
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
++			fflush(stderr);
+             break;
++		}
+         if(ctx->scanned)
+             *ctx->scanned += bytes / CL_COUNT_PRECISION;
+ 
+@@ -899,6 +905,8 @@ int cli_fmap_scandesc(cli_ctx *ctx, cli_file_t ftype, uint8_t ftonly, struct cli
+                 cl_hash_destroy(md5ctx);
+                 cl_hash_destroy(sha1ctx);
+                 cl_hash_destroy(sha256ctx);
++				fprintf(stderr, "TRACE offest: %s:%d\n", __FUNCTION__, __LINE__);
++				fflush(stderr);
+                 return ret;
+             }
+         }
+@@ -926,6 +934,8 @@ int cli_fmap_scandesc(cli_ctx *ctx, cli_file_t ftype, uint8_t ftonly, struct cli
+                 cl_hash_destroy(md5ctx);
+                 cl_hash_destroy(sha1ctx);
+                 cl_hash_destroy(sha256ctx);
++				fprintf(stderr, "TRACE offest: %s:%d\n", __FUNCTION__, __LINE__);
++				fflush(stderr);
+                 return ret;
+             } else if((acmode & AC_SCAN_FT) && ret >= CL_TYPENO) {
+                 if(ret > type)
+@@ -947,11 +957,15 @@ int cli_fmap_scandesc(cli_ctx *ctx, cli_file_t ftype, uint8_t ftonly, struct cli
+             }
+         }
+ 
+-        if(bytes < SCANBUFF)
++        if(bytes < SCANBUFF) {
++			fprintf(stderr, "TRACE offest: %s:%d\n", __FUNCTION__, __LINE__);
++			fflush(stderr);
+             break;
++		}
+ 
+         offset += bytes - maxpatlen;
+     }
++    fprintf(stderr, "TRACE offest: %llu, map->len: %llu\n", offset, map->len);
+ 
+     if(!ftonly && hdb) {
+         enum CLI_HASH_TYPE hashtype, hashtype2;
+diff --git a/libclamav/mbox.c b/libclamav/mbox.c
+--- a/libclamav/mbox.c
++++ b/libclamav/mbox.c
+@@ -707,6 +707,7 @@ parseEmailFile(fmap_t *map, size_t *at, const table_t *rfc821, const char *first
+ 
+ 				assert(fullline != NULL);
+ 
++				fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+ 				if((lookahead = fmap_need_off_once(map, *at, 1))) {
+ 					/*
+ 					 * Section B.2 of RFC822 says TAB or
+@@ -3305,6 +3306,7 @@ getline_from_mbox(char *buffer, size_t buffer_len, fmap_t *map, size_t *at)
+     char *curbuf;
+     size_t i;
+     size_t input_len = MIN(map->len - *at, buffer_len + 1);
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     src = cursrc = fmap_need_off_once(map, *at, input_len);
+ 
+ /*	we check for eof from the result of GETC()
+diff --git a/libclamav/msdoc.c b/libclamav/msdoc.c
+--- a/libclamav/msdoc.c
++++ b/libclamav/msdoc.c
+@@ -728,6 +728,7 @@ static int ole2_summary_propset_json(summary_ctx_t *sctx, off_t offset)
+         sctx->flags |= OLE2_SUMMARY_ERROR_TOOSMALL;
+         return CL_EFORMAT;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     hdr = (unsigned char*)fmap_need_off_once(sctx->sfmap, foff, (2*sizeof(uint32_t)));
+     if (!hdr) {
+         sctx->flags |= OLE2_SUMMARY_ERROR_DATABUF;
+@@ -756,6 +757,7 @@ static int ole2_summary_propset_json(summary_ctx_t *sctx, off_t offset)
+         sctx->flags |= OLE2_SUMMARY_ERROR_TOOSMALL;
+         return CL_EFORMAT;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     ps = (unsigned char*)fmap_need_off_once(sctx->sfmap, foff, sctx->pssize);
+     if (!ps) {
+         sctx->flags |= OLE2_SUMMARY_ERROR_DATABUF;
+@@ -926,6 +928,7 @@ int cli_ole2_summary_json(cli_ctx *ctx, int fd, int mode)
+         sctx.flags |= OLE2_SUMMARY_ERROR_TOOSMALL;
+         return cli_ole2_summary_json_cleanup(&sctx, CL_EFORMAT);
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     databuf = (unsigned char*)fmap_need_off_once(sctx.sfmap, foff, sizeof(summary_stub_t));
+     if (!databuf) {
+         sctx.flags |= OLE2_SUMMARY_ERROR_DATABUF;
+@@ -958,6 +961,7 @@ int cli_ole2_summary_json(cli_ctx *ctx, int fd, int mode)
+         sctx.flags |= OLE2_SUMMARY_ERROR_TOOSMALL;
+         return cli_ole2_summary_json_cleanup(&sctx, CL_EFORMAT);
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     databuf = (unsigned char*)fmap_need_off_once(sctx.sfmap, foff, sizeof(propset_entry_t));
+     if (!databuf) {
+         sctx.flags |= OLE2_SUMMARY_ERROR_DATABUF;
+diff --git a/libclamav/msexpand.c b/libclamav/msexpand.c
+--- a/libclamav/msexpand.c
++++ b/libclamav/msexpand.c
+@@ -76,6 +76,7 @@ struct msexp_hdr {
+     rbytes = MIN(RW_SIZE, map->len - cur_off);  \
+     if(!rbytes)					\
+ 	break;					\
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);\
+     rbuff = fmap_need_off_once(map, cur_off, rbytes); \
+     if(!rbuff)					\
+ 	return CL_EREAD;			\
+@@ -104,6 +105,7 @@ int cli_msexpand(cli_ctx *ctx, int ofd)
+ 	unsigned int fsize;
+ 	int ret;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     if(!(hdr = fmap_need_off_once(map, 0, sizeof(*hdr))))
+ 	return CL_EREAD;
+ 
+diff --git a/libclamav/msxml.c b/libclamav/msxml.c
+--- a/libclamav/msxml.c
++++ b/libclamav/msxml.c
+@@ -119,6 +119,7 @@ static inline size_t msxml_read_cb_new_window(struct msxml_cbdata *cbdata)
+         return 0;
+     }
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     new_window = fmap_need_off_once(cbdata->map, new_mappos, bytes);
+     if (!new_window) {
+         cli_errmsg("msxml_read_cb: cannot acquire new window for fmap\n");
+diff --git a/libclamav/nsis/nulsft.c b/libclamav/nsis/nulsft.c
+--- a/libclamav/nsis/nulsft.c
++++ b/libclamav/nsis/nulsft.c
+@@ -232,6 +232,8 @@ static int nsis_unpack_next(struct nsis_st *n, cli_ctx *ctx) {
+       n->curpos += size;
+       return ret;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
++	fflush(stderr);
+     if (!(ibuf = fmap_need_off_once(n->map, n->curpos, size))) {
+       cli_dbgmsg("NSIS: cannot read %u bytes"__AT__"\n", size);
+       return CL_EREAD;
+@@ -318,6 +320,7 @@ static int nsis_unpack_next(struct nsis_st *n, cli_ctx *ctx) {
+ 	cli_dbgmsg("NSIS: decompressor init failed\n");
+ 	return ret;
+       }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+       if(!(n->freeme = fmap_need_off_once(n->map, n->curpos, n->asz))) {
+ 	cli_dbgmsg("NSIS: cannot read %u bytes"__AT__"\n", n->asz);
+ 	return CL_EREAD;
+@@ -429,6 +432,7 @@ static int nsis_headers(struct nsis_st *n, cli_ctx *ctx) {
+   int i;
+   uint8_t comps[] = {0, 0, 0, 0}, trunc = 0;
+   
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+   if (!(buf = fmap_need_off_once(n->map, n->off, 0x1c)))
+     return CL_EREAD;
+ 
+diff --git a/libclamav/ole2_extract.c b/libclamav/ole2_extract.c
+--- a/libclamav/ole2_extract.c
++++ b/libclamav/ole2_extract.c
+@@ -401,6 +401,7 @@ ole2_read_block(ole2_header_t * hdr, void *buff, unsigned int size, int32_t bloc
+     if ((offend <= 0) || (offend > hdr->m_length)) {
+         return FALSE;
+     }
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     if (!(pblock = fmap_need_off_once(hdr->map, offset, size))) {
+         return FALSE;
+     }
+@@ -1226,6 +1227,7 @@ cli_ole2_extract(const char *dirname, cli_ctx * ctx, struct uniq **vba)
+     }
+     hdr.map = *ctx->fmap;
+     hdr.m_length = hdr.map->len;
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     phdr = fmap_need_off_once(hdr.map, 0, hdr_size);
+     if (phdr) {
+         memcpy(&hdr, phdr, hdr_size);
+diff --git a/libclamav/others.c b/libclamav/others.c
+--- a/libclamav/others.c
++++ b/libclamav/others.c
+@@ -878,6 +878,7 @@ int cli_checklimits(const char *who, cli_ctx *ctx, unsigned long need1, unsigned
+ }
+ 
+ int cli_updatelimits(cli_ctx *ctx, unsigned long needed) {
++    TRACE();
+     int ret=cli_checklimits("cli_updatelimits", ctx, needed, 0, 0);
+ 
+     if (ret != CL_CLEAN) return ret;
+@@ -1139,6 +1140,10 @@ int cli_rmdirs(const char *dirname)
+ 	char err[128];
+ 
+ 
++  if (memcmp(dirname, ":mem:", 5) == 0) {
++    return rmdir(dirname);
++  }
++
+     chmod(dirname, 0700);
+     if((dd = opendir(dirname)) != NULL) {
+ 	while(CLAMSTAT(dirname, &maind) != -1) {
+@@ -1248,6 +1253,7 @@ bitset_t *cli_bitset_init(void)
+ 
+ void cli_bitset_free(bitset_t *bs)
+ {
++    TRACE();
+ 	if (!bs) {
+ 		return;
+ 	}
+diff --git a/libclamav/others.h b/libclamav/others.h
+--- a/libclamav/others.h
++++ b/libclamav/others.h
+@@ -542,7 +542,7 @@ const char *cli_get_last_virus_str(const cli_ctx *ctx);
+ #define CLI_ROR(a,b) a = ( a >> ((b) & __SHIFTMASK(a)) ) | ( a << ((__SHIFTBITS(a) - (b)) & __SHIFTMASK(a)) )
+ 
+ /* Implementation independent sign-extended signed right shift */
+-#ifdef HAVE_SAR
++#if defined(HAVE_SAR) || defined(__native_client__)
+ #define CLI_SRS(n,s) ((n)>>(s))
+ #else
+ #define CLI_SRS(n,s) ((((n)>>(s)) ^ (1<<(sizeof(n)*8-1-s))) - (1<<(sizeof(n)*8-1-s)))
+@@ -614,11 +614,11 @@ static inline int cli_getpagesize(void) {
+ }
+ #else /* ! _WIN32 */
+ #if HAVE_SYSCONF_SC_PAGESIZE
+-static inline int cli_getpagesize(void) { return sysconf(_SC_PAGESIZE); }
++static inline int cli_getpagesize(void) { return 4096;/*return sysconf(_SC_PAGESIZE);*/ }
+ #define HAVE_CLI_GETPAGESIZE 1
+ #else
+ #if HAVE_GETPAGESIZE
+-static inline int cli_getpagesize(void) { return getpagesize(); }
++static inline int cli_getpagesize(void) { return 4096;/*return getpagesize();*/ }
+ #define HAVE_CLI_GETPAGESIZE 1
+ #endif /* HAVE_GETPAGESIZE */
+ #endif /* HAVE_SYSCONF_SC_PAGESIZE */
+diff --git a/libclamav/others_common.c b/libclamav/others_common.c
+--- a/libclamav/others_common.c
++++ b/libclamav/others_common.c
+@@ -83,12 +83,14 @@ static void cli_ctx_tls_key_alloc(void)
+ 
+ void cli_logg_setup(const cli_ctx *ctx)
+ {
++    TRACE();
+     pthread_once(&cli_ctx_tls_key_once, cli_ctx_tls_key_alloc);
+     pthread_setspecific(cli_ctx_tls_key, ctx);
+ }
+ 
+ void cli_logg_unsetup(void)
+ {
++    TRACE();
+     pthread_setspecific(cli_ctx_tls_key, NULL);
+ }
+ 
+@@ -299,7 +301,7 @@ const char* cli_ctime(const time_t *timep, char *buf, const size_t bufsize)
+ 		return buf;
+ 	}
+ 
+-#ifdef HAVE_CTIME_R	
++#ifdef HAVE_CTIME_R
+ # ifdef HAVE_CTIME_R_2
+ 	ret = ctime_r(timep, buf);
+ # else
+@@ -337,6 +339,7 @@ int cli_readn(int fd, void *buff, unsigned int count)
+         int retval;
+         unsigned int todo;
+         unsigned char *current;
++		TRACE();
+ 
+ 
+         todo = count;
+@@ -437,6 +440,8 @@ int cli_filecopy(const char *src, const char *dest)
+ #endif /* P_tmpdir */
+ 
+ const char *cli_gettmpdir(void) {
++  return ":mem:clamav-tmp";
++#if 0
+ 	const char *tmpdir;
+     unsigned int i;
+ 
+@@ -451,6 +456,7 @@ const char *cli_gettmpdir(void) {
+             return tmpdir;
+ 
+     return P_tmpdir;
++#endif
+ }
+ 
+ struct dirent_data {
+@@ -854,6 +860,8 @@ unsigned int cli_rndnum(unsigned int max)
+     return 1 + (unsigned int) (max * (rand() / (1.0 + RAND_MAX)));
+ }
+ 
++uint64_t tmpctr = 0;
++
+ char *cli_gentemp(const char *dir)
+ {
+ 	char *name, *tmp;
+@@ -870,6 +878,13 @@ char *cli_gentemp(const char *dir)
+ 	cli_dbgmsg("cli_gentemp('%s'): out of memory\n", mdir);
+ 	return NULL;
+     }
++    // yxu: replace rand with counter
++#ifdef __native_client__
++	snprintf(name, len, "%s"PATHSEP"clamav-%llu.tmp", mdir, tmpctr++);
++#else
++	snprintf(name, len, "%s"PATHSEP"clamav-%lu.tmp", mdir, tmpctr++);
++#endif
++  return name;
+ 
+ #ifdef CL_THREAD_SAFE
+     pthread_mutex_lock(&cli_gentemp_mutex);
+diff --git a/libclamav/pdf.c b/libclamav/pdf.c
+--- a/libclamav/pdf.c
++++ b/libclamav/pdf.c
+@@ -377,6 +377,7 @@ static void pdfobj_flag(struct pdf_struct *pdf, struct pdf_obj *obj, enum pdf_fl
+ 
+ static int filter_flatedecode(struct pdf_struct *pdf, struct pdf_obj *obj, const char *buf, off_t len, int fout, off_t *sum)
+ {
++    TRACE();
+     int skipped = 0;
+     int zstat;
+     z_stream stream;
+@@ -387,6 +388,7 @@ static int filter_flatedecode(struct pdf_struct *pdf, struct pdf_obj *obj, const
+         return CL_CLEAN;
+ 
+     if (*buf == '\r') {
++    	TRACE();
+         buf++;
+         len--;
+         pdfobj_flag(pdf, obj, BAD_STREAMSTART);
+@@ -866,6 +868,7 @@ enum cstate {
+ 
+ static void process(struct text_norm_state *s, enum cstate *st, const char *buf, int length, int fout)
+ {
++    TRACE();
+     do {
+         switch (*st) {
+         case CSTATE_NONE:
+@@ -906,6 +909,7 @@ static void process(struct text_norm_state *s, enum cstate *st, const char *buf,
+ 
+ static int pdf_scan_contents(int fd, struct pdf_struct *pdf)
+ {
++    TRACE();
+     struct text_norm_state s;
+     char fullname[1024];
+     char outbuff[BUFSIZ];
+@@ -2436,6 +2440,7 @@ int cli_pdf(const char *dir, cli_ctx *ctx, off_t offset)
+     json_object *pdfobj=NULL;
+     char *begin, *end, *p1;
+ #endif
++	TRACE();
+ 
+     cli_dbgmsg("in cli_pdf(%s)\n", dir);
+     memset(&pdf, 0, sizeof(pdf));
+@@ -2443,6 +2448,7 @@ int cli_pdf(const char *dir, cli_ctx *ctx, off_t offset)
+     pdf.dir = dir;
+     pdf.enc_objid = ~0u;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     pdfver = start = fmap_need_off_once(map, offset, versize);
+ 
+     /* Check PDF version */
+@@ -2511,6 +2517,7 @@ int cli_pdf(const char *dir, cli_ctx *ctx, off_t offset)
+ 
+     bytesleft = map->len - map_off;
+ 
++	fprintf(stderr, "%s:%d\n", __FUNCTION__, __LINE__);
+     eofmap = fmap_need_off_once(map, map_off, bytesleft);
+     if (!eofmap) {
+         cli_errmsg("cli_pdf: mmap() failed (2)\n");
+@@ -2566,6 +2573,7 @@ int cli_pdf(const char *dir, cli_ctx *ctx, off_t offset)
+             if (bytesleft > 4096)
+                 bytesleft = 4096;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             q = fmap_need_off_once(map, offset + xref, bytesleft);
+             if (!q || xrefCheck(q, q+bytesleft) == -1) {
+                 cli_dbgmsg("cli_pdf: did not find valid xref\n");
+diff --git a/libclamav/pe.c b/libclamav/pe.c
+--- a/libclamav/pe.c
++++ b/libclamav/pe.c
+@@ -296,12 +296,14 @@ void findres(uint32_t by_type, uint32_t by_name, uint32_t res_rva, fmap_t *map,
+     }
+ 
+     while(type_cnt--) {
++    fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!fmap_need_ptr_once(map, type_entry, 8))
+ 	    return;
+ 	type = cli_readint32(type_entry);
+ 	type_offs = cli_readint32(type_entry+4);
+ 	if(type == by_type && (type_offs>>31)) {
+ 	    type_offs &= 0x7fffffff;
++		fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	    if (!(resdir = fmap_need_off_once(map, cli_rawaddr(res_rva + type_offs, exe_sections, nsections, &err, map->len, hdr_size), 16)) || err)
+ 		return;
+ 
+@@ -320,6 +322,7 @@ void findres(uint32_t by_type, uint32_t by_name, uint32_t res_rva, fmap_t *map,
+ 		name_offs = cli_readint32(name_entry+4);
+ 		if((by_name == 0xffffffff || name == by_name) && (name_offs>>31)) {
+ 		    name_offs &= 0x7fffffff;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 		    if (!(resdir = fmap_need_off_once(map, cli_rawaddr(res_rva + name_offs, exe_sections, nsections, &err, map->len, hdr_size), 16)) || err)
+ 			return;
+ 		    
+@@ -355,6 +358,7 @@ static void cli_parseres_special(uint32_t base, uint32_t rva, fmap_t *map, struc
+ 
+     if(level>2 || !*maxres) return;
+     *maxres-=1;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     if(err || !(resdir = fmap_need_off_once(map, rawaddr, 16)))
+ 	    return;
+     named = (uint16_t)cli_readint16(resdir+12);
+@@ -415,6 +419,7 @@ static void cli_parseres_special(uint32_t base, uint32_t rva, fmap_t *map, struc
+ 	else {
+ 			offs = cli_readint32(entry+4);
+ 			rawaddr = cli_rawaddr(base + offs, exe_sections, nsections, &err, fsize, hdr_size);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 			if (!err && (resdir = fmap_need_off_once(map, rawaddr, 16))) {
+ 				uint32_t isz = cli_readint32(resdir+4);
+ 				const uint8_t *str;
+@@ -428,6 +433,7 @@ static void cli_parseres_special(uint32_t base, uint32_t rva, fmap_t *map, struc
+ 				}
+ 				if ((id&0xff) != 0x09) /* english res only */
+ 				    continue;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 				if((str = fmap_need_off_once(map, rawaddr, isz)))
+ 					cli_detect_swizz_str(str, isz, stats, type);
+ 			}
+@@ -446,6 +452,7 @@ static unsigned int cli_hashsect(fmap_t *map, struct cli_exe_section *s, unsigne
+     }
+ 
+     if(!s->rsz) return 0;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     if(!(hashme=fmap_need_off_once(map, s->raw, s->rsz))) {
+         cli_dbgmsg("cli_hashsect: unable to read section data\n");
+         return 0;
+@@ -502,6 +509,7 @@ static int scan_pe_mdb (cli_ctx * ctx, struct cli_exe_section *exe_section)
+                 exe_section->rsz, md5[0], md5[1], md5[2], md5[3], md5[4], md5[5], md5[6], md5[7],
+                 md5[8], md5[9], md5[10], md5[11], md5[12], md5[13], md5[14], md5[15]);
+         } else if (cli_always_gen_section_hash) {
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             const void *hashme = fmap_need_off_once(*ctx->fmap, exe_section->raw, exe_section->rsz);
+             if (!(hashme)) {
+                 cli_errmsg("scan_pe_mdb: unable to read section data\n");
+@@ -1605,6 +1613,7 @@ int cli_scanpe(cli_ctx *ctx)
+             int bw = rsize < 0x7000 ? rsize : 0x7000;
+             const char *tbuff;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if((tbuff = fmap_need_off_once(map, exe_sections[nsections - 1].raw + rsize - bw, 4096))) {
+                 if(cli_memstr(tbuff, 4091, "\xe8\x2c\x61\x00\x00", 5)) {
+                     cli_append_virus(ctx, dam ? "Heuristics.W32.Magistr.A.dam" : "Heuristics.W32.Magistr.A");
+@@ -1620,6 +1629,7 @@ int cli_scanpe(cli_ctx *ctx)
+             int bw = rsize < 0x8000 ? rsize : 0x8000;
+             const char *tbuff;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if((tbuff = fmap_need_off_once(map, exe_sections[nsections - 1].raw + rsize - bw, 4096))) {
+                 if(cli_memstr(tbuff, 4091, "\xe8\x04\x72\x00\x00", 5)) {
+                     cli_append_virus(ctx,dam ? "Heuristics.W32.Magistr.B.dam" : "Heuristics.W32.Magistr.B");
+@@ -1644,6 +1654,7 @@ int cli_scanpe(cli_ctx *ctx)
+             break;
+         if(exe_sections[0].rsz < 5)
+             break;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(code=fmap_need_off_once(map, exe_sections[0].raw, exe_sections[0].rsz)))
+             break;
+ 
+@@ -1688,6 +1699,7 @@ int cli_scanpe(cli_ctx *ctx)
+ 
+         cli_dbgmsg("Polipos: Checking %d xsect jump(s)\n", xsjs);
+         for(i=0;i<xsjs;i++) {
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if(!(code = fmap_need_off_once(map, jumps[i], 9)))
+                 continue;
+ 
+@@ -1770,6 +1782,7 @@ int cli_scanpe(cli_ctx *ctx)
+             cli_dbgmsg ("MEW: found MEW characteristics %08X + %08X + 5 = %08X\n", 
+                 cli_readint32(epbuff + 1), vep, cli_readint32(epbuff + 1) + vep + 5);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if(!(tbuff = fmap_need_off_once(map, fileoffset, 0xb0)))
+                 break;
+ 
+@@ -1977,6 +1990,7 @@ int cli_scanpe(cli_ctx *ctx)
+             break;
+         }
+         
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!exe_sections[i + 1].rsz || !(src = fmap_need_off_once(map, exe_sections[i + 1].raw, ssize))) {
+             cli_dbgmsg("Can't read raw data of section %d\n", i + 1);
+             free(exe_sections);
+@@ -2067,6 +2081,7 @@ int cli_scanpe(cli_ctx *ctx)
+ 
+         CLI_UNPSIZELIMITS("FSG", gp);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(support = fmap_need_off_once(map, t, gp))) {
+             cli_dbgmsg("Can't read %d bytes from padding area\n", gp); 
+             free(exe_sections);
+@@ -2120,6 +2135,7 @@ int cli_scanpe(cli_ctx *ctx)
+         for(t = 1; t <= (uint32_t)sectcnt; t++)
+             sections[t].rva = cli_readint32(support + 8 + t * 4) - 1 - EC32(optional_hdr32.ImageBase);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!exe_sections[i + 1].rsz || !(src = fmap_need_off_once(map, exe_sections[i + 1].raw, ssize))) {
+             cli_dbgmsg("Can't read raw data of section %d\n", i);
+             free(exe_sections);
+@@ -2186,6 +2202,7 @@ int cli_scanpe(cli_ctx *ctx)
+ 
+         CLI_UNPSIZELIMITS("FSG", gp)
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(support = fmap_need_off_once(map, t, gp))) {
+             cli_dbgmsg("Can't read %d bytes from padding area\n", gp); 
+             free(exe_sections);
+@@ -2221,6 +2238,7 @@ int cli_scanpe(cli_ctx *ctx)
+         for(t = 0; t <= (uint32_t)sectcnt - 1; t++)
+             sections[t+1].rva = (((support[t*2]|(support[t*2+1]<<8))-2)<<12)-EC32(optional_hdr32.ImageBase);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!exe_sections[i + 1].rsz || !(src = fmap_need_off_once(map, exe_sections[i + 1].raw, ssize))) {
+             cli_dbgmsg("FSG: Can't read raw data of section %d\n", i);
+             free(exe_sections);
+@@ -2268,6 +2286,7 @@ int cli_scanpe(cli_ctx *ctx)
+             return CL_CLEAN;
+         }
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!exe_sections[i + 1].rsz || !(src = fmap_need_off_once(map, exe_sections[i + 1].raw, ssize))) {
+             cli_dbgmsg("UPX: Can't read raw data of section %d\n", i+1);
+             free(exe_sections);
+@@ -2747,6 +2766,7 @@ out_no_petite:
+             if (!(rep = cli_rawaddr(eprva, exe_sections, nsections, &err, fsize, hdr_size)) && err)
+                 break;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if (!(nbuff = fmap_need_off_once(map, rep, 24)))
+                 break;
+ 
+@@ -2759,10 +2779,12 @@ out_no_petite:
+         nowinldr = 0x54-cli_readint32(src+17);
+         cli_dbgmsg("NsPack: Found *start_of_stuff @delta-%x\n", nowinldr);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(nbuff = fmap_need_off_once(map, rep-nowinldr, 4)))
+             break;
+ 
+         start_of_stuff=rep+cli_readint32(nbuff);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(nbuff = fmap_need_off_once(map, start_of_stuff, 20)))
+             break;
+ 
+@@ -2798,6 +2820,7 @@ out_no_petite:
+           break;
+         }
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+         if(!(nbuff = fmap_need_off_once(map, rep, 5))) {
+           free(dest);
+           break;
+@@ -3051,6 +3074,7 @@ int cli_peheader(fmap_t *map, struct cli_exe_info *peinfo)
+             if(err)
+                 continue;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if(!(vptr = fmap_need_off_once(map, rva, 16)))
+                 continue;
+ 
+@@ -3061,6 +3085,7 @@ int cli_peheader(fmap_t *map, struct cli_exe_info *peinfo)
+             rva = cli_rawaddr(rva, peinfo->section, peinfo->nsections, &err, fsize, hdr_size);
+             if(err)
+                 continue;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             if(!(vptr = fmap_need_off_once(map, rva, res_sz)))
+                 continue;
+             
+@@ -3314,6 +3339,7 @@ int cli_checkfp_pe(cli_ctx *ctx, uint8_t *authsha1, stats_section_t *hashes, uin
+     valign = (pe_plus)?EC32(optional_hdr64.SectionAlignment):EC32(optional_hdr32.SectionAlignment);
+     falign = (pe_plus)?EC32(optional_hdr64.FileAlignment):EC32(optional_hdr32.FileAlignment);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     section_hdr = fmap_need_off_once(map, at, sizeof(*section_hdr) * nsections);
+     if(!section_hdr)
+         return CL_EFORMAT;
+@@ -3389,6 +3415,7 @@ int cli_checkfp_pe(cli_ctx *ctx, uint8_t *authsha1, stats_section_t *hashes, uin
+     do { \
+         const uint8_t *hptr; \
+         if(!(size)) break; \
++		fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);\
+         if(!(hptr = fmap_need_off_once(map, where, size))){ \
+             free(exe_sections); \
+             if (hashctx) \
+diff --git a/libclamav/pe_icons.c b/libclamav/pe_icons.c
+--- a/libclamav/pe_icons.c
++++ b/libclamav/pe_icons.c
+@@ -176,6 +176,7 @@ int cli_groupiconscan(struct ICON_ENV *icon_env, uint32_t rva)
+ 
+     int err = 0;
+     fmap_t *map = *ctx->fmap;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     const uint8_t *grp = fmap_need_off_once(map, cli_rawaddr(rva, exe_sections, nsections, (unsigned int *)(&err), map->len, hdr_size), 16);
+ 
+     if(grp && !err) {
+@@ -196,6 +197,7 @@ int cli_groupiconscan(struct ICON_ENV *icon_env, uint32_t rva)
+ 
+             raddr = cli_rawaddr(cli_readint32(grp), exe_sections, nsections, (unsigned int *)(&err), map->len, hdr_size);
+             cli_dbgmsg("cli_scanicon: icon group @%x\n", raddr);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+             grp = fmap_need_off_once(map, raddr, gsz);
+             if(grp && !err) {
+                 icnt = cli_readint32(grp+2) >> 16;
+@@ -1330,6 +1332,7 @@ static int parseicon(struct ICON_ENV *icon_env, uint32_t rva) {
+     icoff = cli_rawaddr(rva, exe_sections, nsections, &err, map->len, hdr_size);
+ 
+     /* read the bitmap header */
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     if(err || !(rawimage = fmap_need_off_once(map, icoff, 4))) {
+ 	icon_env->err_oof++;
+ 	//cli_dbgmsg("parseicon: offset to icon is out of file\n");
+@@ -1409,6 +1412,7 @@ static int parseicon(struct ICON_ENV *icon_env, uint32_t rva) {
+ 
+     /* read the raw image */
+     
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     if(!(rawimage = fmap_need_off_once(map, icoff, height * (scanlinesz + andlinesz)))) {
+ 	if(palette) fmap_unneed_ptr(map, palette, (1<<depth) * sizeof(int));
+ 	return CL_SUCCESS;
+@@ -1473,6 +1477,7 @@ static int parseicon(struct ICON_ENV *icon_env, uint32_t rva) {
+ 
+     if(depth == 32 && !special_32_is_32) { /* Sometimes it really is 24. Exploited live - see sample 0013839101 */
+ 	andlinesz = 4*(width / 32) + 4*(width % 32 != 0);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(rawimage = fmap_need_off_once(map, icoff + height * scanlinesz, height * andlinesz))) {
+ 	    /* Likely a broken sample - 32bit icon with 24bit data and a broken mask:
+ 	       i could really break out here but i've got the full image, so i'm just forcing full alpha
+diff --git a/libclamav/scanners.c b/libclamav/scanners.c
+--- a/libclamav/scanners.c
++++ b/libclamav/scanners.c
+@@ -188,7 +188,7 @@ static int cli_scandir(const char *dirname, cli_ctx *ctx)
+ 		    free(fname);
+ 		}
+ 	    }
+-	} 
++	}
+     } else {
+ 	cli_dbgmsg("cli_scandir: Can't open directory %s.\n", dirname);
+ 	return CL_EOPEN;
+@@ -547,6 +547,7 @@ static int cli_scangzip(cli_ctx *ctx)
+ 
+     while (at < map->len) {
+ 	unsigned int bytes = MIN(map->len - at, map->pgsz);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(z.next_in = (void*)fmap_need_off_once(map, at, bytes))) {
+ 	    cli_dbgmsg("GZip: Can't read %u bytes @ %lu.\n", bytes, (long unsigned)at);
+ 	    inflateEnd(&z);
+@@ -1378,6 +1379,7 @@ static int cli_scanscript(cli_ctx *ctx)
+ 
+ 	while(1) {
+ 	    size_t len = MIN(map->pgsz, map->len - at);
++			fprintf(stderr, "TRACE map->pgsz: %llu, map->len %llu, at %lu, %s:%d\n", map->pgsz, map->len, at, __FUNCTION__, __LINE__);
+ 	    buff = fmap_need_off_once(map, at, len);
+ 	    at += len;
+ 	    if(!buff || !len || state.out_pos + len > state.out_len) {
+@@ -1390,9 +1392,12 @@ static int cli_scanscript(cli_ctx *ctx)
+ 		}
+ 		/* when we flush the buffer also scan */
+ 		if(cli_scanbuff(state.out, state.out_pos, offset, ctx, CL_TYPE_TEXT_ASCII, mdata) == CL_VIRUS) {
+-		    if (SCAN_ALL)
++		    if (SCAN_ALL) {
++				fprintf(stderr, "SCAN_ALL YES\n");
+ 			viruses_found++;
++			}
+ 		    else {
++				fprintf(stderr, "SCAN_ALL NO\n");
+ 			ret = CL_VIRUS;
+ 			break;
+ 		    }
+@@ -1406,7 +1411,10 @@ static int cli_scanscript(cli_ctx *ctx)
+ 		text_normalize_reset(&state);
+ 		state.out_pos = maxpatlen;
+ 	    }
+-	    if(!len) break;
++	    if(!len) {
++			fprintf(stderr, "NO LEN break\n");
++			break;
++		}
+ 	    if(!buff || text_normalize_buffer(&state, buff, len) != len) {
+ 		cli_dbgmsg("cli_scanscript: short read during normalizing\n");
+ 	    }
+@@ -1455,6 +1463,7 @@ static int cli_scanhtml_utf16(cli_ctx *ctx)
+ 
+     while(at < map->len) {
+ 	bytes = MIN(map->len - at, map->pgsz * 16);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buff = fmap_need_off_once(map, at, bytes))) {
+ 	    close(fd);
+ 	    cli_unlink(tempname);
+@@ -1751,6 +1760,7 @@ static int cli_scanpdf(cli_ctx *ctx, off_t offset)
+ {
+ 	int ret;
+ 	char *dir = cli_gentemp(ctx->engine->tmpdir);
++    TRACE();
+ 
+     if(!dir)
+ 	return CL_EMEM;
+@@ -1972,6 +1982,7 @@ static int cli_scanembpe(cli_ctx *ctx, off_t offset)
+ 	if(!bytes)
+ 	    break;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buff = fmap_need_off_once(map, offset + size, bytes))) {
+ 	    close(fd);
+ 	    if(!ctx->engine->keeptmp) {
+@@ -2036,7 +2047,7 @@ static int cli_scanembpe(cli_ctx *ctx, off_t offset)
+ }
+ 
+ 
+-#if defined(_WIN32) || defined(C_LINUX)
++#if (defined(_WIN32) || defined(C_LINUX)) && !defined(__OSA__)
+ #define PERF_MEASURE
+ #endif
+ 
+@@ -2092,6 +2103,7 @@ static void get_thread_times(uint64_t *kt, uint64_t *ut)
+ 
+ static inline void perf_init(cli_ctx *ctx)
+ {
++    TRACE();
+     uint64_t kt,ut;
+     unsigned i;
+ 
+@@ -2112,6 +2124,7 @@ static inline void perf_init(cli_ctx *ctx)
+ 
+ static inline void perf_done(cli_ctx* ctx)
+ {
++    TRACE();
+     char timestr[512];
+     char *p;
+     unsigned i;
+@@ -2443,6 +2456,7 @@ static int cli_scanraw(cli_ctx *ctx, cli_file_t type, uint8_t typercg, cli_file_
+ 
+ 
+ static void emax_reached(cli_ctx *ctx) {
++    TRACE();
+     fmap_t **ctx_fmap = ctx->fmap;
+     if (!ctx_fmap)
+ 	return;
+@@ -2546,6 +2560,7 @@ static int dispatch_prescan(clcb_pre_scan cb, cli_ctx *ctx, const char *filetype
+ 
+ static int magic_scandesc(cli_ctx *ctx, cli_file_t type)
+ {
++        TRACE();
+ 	int ret = CL_CLEAN;
+ 	cli_file_t dettype = 0;
+ 	uint8_t typercg = 1;
+@@ -2563,27 +2578,32 @@ static int magic_scandesc(cli_ctx *ctx, cli_file_t type)
+ #endif
+ 
+     if(!ctx->engine) {
++        TRACE();
+ 	cli_errmsg("CRITICAL: engine == NULL\n");
+ 	early_ret_from_magicscan(CL_ENULLARG);
+     }
+ 
+     if(!(ctx->engine->dboptions & CL_DB_COMPILED)) {
++        TRACE();
+ 	cli_errmsg("CRITICAL: engine not compiled\n");
+ 	early_ret_from_magicscan(CL_EMALFDB);
+     }
+ 
+     if(ctx->engine->maxreclevel && ctx->recursion > ctx->engine->maxreclevel) {
++        TRACE();
+         cli_dbgmsg("cli_magic_scandesc: Archive recursion limit exceeded (%u, max: %u)\n", ctx->recursion, ctx->engine->maxreclevel);
+ 	emax_reached(ctx);
+ 	early_ret_from_magicscan(CL_CLEAN);
+     }
+ 
+     if(cli_updatelimits(ctx, (*ctx->fmap)->len)!=CL_CLEAN) {
+-	emax_reached(ctx);
++        TRACE();
++		emax_reached(ctx);
+         early_ret_from_magicscan(CL_CLEAN);
+     }
+     old_hook_lsig_matches = ctx->hook_lsig_matches;
+     if(type == CL_TYPE_PART_ANY) {
++        TRACE();
+ 	typercg = 0;
+     }
+ 
+@@ -3187,6 +3207,7 @@ static int magic_scandesc(cli_ctx *ctx, cli_file_t type)
+ 
+ static int cli_base_scandesc(int desc, cli_ctx *ctx, cli_file_t type)
+ {
++    TRACE();
+     STATBUF sb;
+     int ret;
+ 
+@@ -3195,10 +3216,12 @@ static int cli_base_scandesc(int desc, cli_ctx *ctx, cli_file_t type)
+ #endif
+     cli_dbgmsg("in cli_magic_scandesc (reclevel: %u/%u)\n", ctx->recursion, ctx->engine->maxreclevel);
+     if(FSTAT(desc, &sb) == -1) {
++        TRACE();
+ 	cli_errmsg("magic_scandesc: Can't fstat descriptor %d\n", desc);
+ 	early_ret_from_magicscan(CL_ESTAT);
+     }
+     if(sb.st_size <= 5) {
++        TRACE();
+ 	cli_dbgmsg("Small data (%u bytes)\n", (unsigned int) sb.st_size);
+ 	early_ret_from_magicscan(CL_CLEAN);
+     }
+@@ -3206,6 +3229,7 @@ static int cli_base_scandesc(int desc, cli_ctx *ctx, cli_file_t type)
+     ctx->fmap++;
+     perf_start(ctx, PERFT_MAP);
+     if(!(*ctx->fmap = fmap(desc, 0, sb.st_size))) {
++        TRACE();
+ 	cli_errmsg("CRITICAL: fmap() failed\n");
+ 	ctx->fmap--;
+ 	perf_stop(ctx, PERFT_MAP);
+@@ -3222,6 +3246,7 @@ static int cli_base_scandesc(int desc, cli_ctx *ctx, cli_file_t type)
+ 
+ int cli_magic_scandesc(int desc, cli_ctx *ctx)
+ {
++    TRACE();
+     return cli_base_scandesc(desc, ctx, CL_TYPE_ANY);
+ }
+ 
+@@ -3322,6 +3347,7 @@ int cli_map_scan(cl_fmap_t *map, off_t offset, size_t length, cli_ctx *ctx, cli_
+ /* For map scans that are not forced to disk */
+ int cli_map_scandesc(cl_fmap_t *map, off_t offset, size_t length, cli_ctx *ctx, cli_file_t type)
+ {
++    TRACE();
+     off_t old_off = map->nested_offset;
+     size_t old_len = map->len;
+     size_t old_real_len = map->real_len;
+@@ -3331,18 +3357,21 @@ int cli_map_scandesc(cl_fmap_t *map, off_t offset, size_t length, cli_ctx *ctx,
+ 	       (long)old_off, (unsigned long)old_len,
+ 	       (long)offset, (unsigned long)length);
+     if (offset < 0 || (size_t)offset >= old_len) {
++        TRACE();
+ 	cli_dbgmsg("Invalid offset: %ld\n", (long)offset);
+ 	return CL_CLEAN;
+     }
+ 
+     if (!length) length = old_len - offset;
+     if (length > old_len - offset) {
++        TRACE();
+ 	cli_dbgmsg("Data truncated: %lu -> %lu\n",
+ 		   (unsigned long)length, old_len - offset);
+ 	length = old_len - offset;
+     }
+ 
+     if (length <= 5) {
++        TRACE();
+ 	cli_dbgmsg("Small data (%u bytes)\n", (unsigned int) length);
+ 	return CL_CLEAN;
+     }
+@@ -3354,8 +3383,10 @@ int cli_map_scandesc(cl_fmap_t *map, off_t offset, size_t length, cli_ctx *ctx,
+     map->len = length;
+     map->real_len = map->nested_offset + length;
+     if (CLI_ISCONTAINED(old_off, old_len, map->nested_offset, map->len)) {
++        TRACE();
+ 	ret = magic_scandesc(ctx, type);
+     } else {
++        TRACE();
+ 	long long len1, len2;
+ 	len1 = old_off + old_len;
+         len2 = map->nested_offset + map->len;
+@@ -3384,15 +3415,18 @@ int cli_mem_scandesc(const void *buffer, size_t length, cli_ctx *ctx)
+ 
+ static int scan_common(int desc, cl_fmap_t *map, const char **virname, unsigned long int *scanned, const struct cl_engine *engine, unsigned int scanoptions, void *context)
+ {
++	TRACE();
+     cli_ctx ctx;
+     int rc;
+     STATBUF sb;
+ 
+     /* We have a limit of around 2.17GB (INT_MAX - 2). Enforce it here. */
+     if (map != NULL) {
++    	TRACE();
+         if ((size_t)(map->real_len) > (size_t)(INT_MAX - 2))
+             return CL_CLEAN;
+     } else {
++    	TRACE();
+         if (FSTAT(desc, &sb))
+             return CL_ESTAT;
+ 
+@@ -3423,7 +3457,9 @@ static int scan_common(int desc, cl_fmap_t *map, const char **virname, unsigned
+     perf_init(&ctx);
+ 
+     if (ctx.options & CL_SCAN_FILE_PROPERTIES && ctx.engine->time_limit != 0) {
++	TRACE();
+         if (gettimeofday(&ctx.time_limit, NULL) == 0) {
++	    TRACE();
+             uint32_t secs = ctx.engine->time_limit / 1000;
+             uint32_t usecs = (ctx.engine->time_limit % 1000) * 1000;
+             ctx.time_limit.tv_sec += secs;
+@@ -3433,6 +3469,7 @@ static int scan_common(int desc, cl_fmap_t *map, const char **virname, unsigned
+                 ctx.time_limit.tv_sec++;
+             }
+         } else {
++            TRACE();
+             char buf[64];
+             cli_dbgmsg("scan_common; gettimeofday error: %s\n", cli_strerror(errno, buf, 64));
+         }
+@@ -3558,6 +3595,7 @@ static int scan_common(int desc, cl_fmap_t *map, const char **virname, unsigned
+ #endif
+ 
+     if (ctx.options & CL_SCAN_ALLMATCHES) {
++        TRACE();
+ 	*virname = (char *)ctx.virname; /* temp hack for scanall mode until api augmentation */
+ 	if (rc == CL_CLEAN && ctx.num_viruses)
+ 	    rc = CL_VIRUS;
+@@ -3574,6 +3612,7 @@ static int scan_common(int desc, cl_fmap_t *map, const char **virname, unsigned
+ 
+ int cl_scandesc_callback(int desc, const char **virname, unsigned long int *scanned, const struct cl_engine *engine, unsigned int scanoptions, void *context)
+ {
++	TRACE();
+     return scan_common(desc, NULL, virname, scanned, engine, scanoptions, context);
+ }
+ 
+@@ -3620,11 +3659,13 @@ static int cli_scanfile(const char *filename, cli_ctx *ctx)
+ 
+ int cl_scanfile(const char *filename, const char **virname, unsigned long int *scanned, const struct cl_engine *engine, unsigned int scanoptions)
+ {
++	TRACE();
+     return cl_scanfile_callback(filename, virname, scanned, engine, scanoptions, NULL);
+ }
+ 
+ int cl_scanfile_callback(const char *filename, const char **virname, unsigned long int *scanned, const struct cl_engine *engine, unsigned int scanoptions, void *context)
+ {
++	TRACE();
+ 	int fd, ret;
+ 	const char *fname = cli_to_utf8_maybe_alloc(filename);
+ 
+diff --git a/libclamav/sis.c b/libclamav/sis.c
+--- a/libclamav/sis.c
++++ b/libclamav/sis.c
+@@ -300,6 +300,7 @@ static int real_scansis(cli_ctx *ctx, const char *tmpd) {
+ 
+   pos = sis.plangs;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+   if (!(llangs = fmap_need_off_once(map, pos, sis.langs * sizeof(uint16_t)))) {
+     cli_dbgmsg("SIS: Unable to read languages\n");
+     return CL_CLEAN;
+@@ -458,6 +459,7 @@ static int real_scansis(cli_ctx *ctx, const char *tmpd) {
+ 	  if (cli_checklimits("sis", ctx,lens[j], 0, 0)!=CL_CLEAN) continue;
+ 	  cli_dbgmsg("\tUnpacking lang#%d - ptr:%x csize:%x osize:%x\n", j, ptrs[j], lens[j], olens[j]);
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	  if (!(comp = fmap_need_off_once(map, ptrs[j], lens[j]))) {
+ 	    cli_dbgmsg("\tSkipping ghost or otherwise out of archive file\n");
+ 	    continue;
+diff --git a/libclamav/special.c b/libclamav/special.c
+--- a/libclamav/special.c
++++ b/libclamav/special.c
+@@ -59,6 +59,7 @@ int cli_check_mydoom_log(cli_ctx *ctx)
+     if(blocks>5)
+ 	blocks = 5;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     record = fmap_need_off_once(map, 0, 8*4*blocks);
+     if(!record)
+ 	return CL_CLEAN;
+@@ -103,6 +104,7 @@ static int jpeg_check_photoshop_8bim(cli_ctx *ctx, off_t *off)
+ 	int retval;
+ 	fmap_t *map = *ctx->fmap;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buf = fmap_need_off_once(map, offset, 4 + 2 + 1))) {
+ 		cli_dbgmsg("read bim failed\n");
+ 		return -1;
+@@ -158,6 +160,7 @@ static int jpeg_check_photoshop(cli_ctx *ctx, off_t offset)
+ 	off_t old;
+ 	fmap_t *map = *ctx->fmap;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buffer = fmap_need_off_once(map, offset, 14))) {
+ 		return 0;
+ 	}
+@@ -191,6 +194,7 @@ int cli_check_jpeg_exploit(cli_ctx *ctx, off_t offset)
+ 	if(ctx->recursion > ctx->engine->maxreclevel)
+ 	    return CL_EMAXREC;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buffer = fmap_need_off_once(map, offset, 2)))
+ 		return 0;
+ 	if ((buffer[0] != 0xff) || (buffer[1] != 0xd8)) {
+@@ -199,6 +203,7 @@ int cli_check_jpeg_exploit(cli_ctx *ctx, off_t offset)
+ 	offset += 2;
+ 	for (;;) {
+ 		off_t new_off;
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 		if(!(buffer = fmap_need_off_once(map, offset, 4))) {
+ 			return 0;
+ 		}
+@@ -261,6 +266,7 @@ static int riff_read_chunk(fmap_t *map, off_t *offset, int big_endian, int rec_l
+ 		return 0;
+ 	}
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buf = fmap_need_off_once(map, cur_offset, 4*2)))
+ 	    return 0;
+ 	cur_offset += 4*2;
+@@ -308,6 +314,7 @@ int cli_check_riff_exploit(cli_ctx *ctx)
+ 	
+ 	cli_dbgmsg("in cli_check_riff_exploit()\n");
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	if(!(buf = fmap_need_off_once(map, 0, 4*3)))
+ 	    return 0;
+ 
+diff --git a/libclamav/stats.c b/libclamav/stats.c
+--- a/libclamav/stats.c
++++ b/libclamav/stats.c
+@@ -31,20 +31,24 @@
+ 
+ #include <sys/types.h>
+ #if !defined(_WIN32)
+-#if defined(C_SOLARIS)
+-#include <sys/utsname.h>
+-#else
+-#if HAVE_SYS_PARAM_H
+-#include <sys/param.h>
+-#endif
+-#if HAVE_SYSCTLBYNAME
+-#include <sys/sysctl.h>
++ #if defined(C_SOLARIS)
++  #include <sys/utsname.h>
++ #else
++  #if HAVE_SYS_PARAM_H
++   #include <sys/param.h>
++  #endif
++  #if HAVE_SYSCTLBYNAME
++   #include <sys/sysctl.h>
++  #endif
++ #endif
++
++#if !defined (__native_client__) || !defined(_NEWLIB_VERSION)
++ #include <dlfcn.h>
+ #endif
+-#endif
+-#include <dlfcn.h>
++
+ #else
+-#include <Windows.h>
+-#include <tchar.h>
++ #include <Windows.h>
++ #include <tchar.h>
+ #endif
+ 
+ #ifdef CL_THREAD_SAFE
+diff --git a/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c b/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
+--- a/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
++++ b/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
+@@ -42,7 +42,7 @@ asm(                                        \
+ : "%eax", "cc")
+ 
+ /******************************************************************/
+-#elif defined(TFM_X86_64)
++#elif (defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__))
+ /* x86-64 code */
+ 
+ #define MONT_START 
+@@ -509,7 +509,7 @@ void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
+        _c   = c + x;
+        tmpm = m->dp;
+        y = 0;
+-       #if (defined(TFM_SSE2) || defined(TFM_X86_64))
++       #if (defined(TFM_SSE2) || defined(TFM_X86_64)) && !defined(__native_client__) && !defined(__OSA__)
+         for (; y < (pa & ~7); y += 8) {
+               INNERMUL8;
+               _c   += 8;
+diff --git a/libclamav/tomsfastmath/mul/fp_mul_comba.c b/libclamav/tomsfastmath/mul/fp_mul_comba.c
+--- a/libclamav/tomsfastmath/mul/fp_mul_comba.c
++++ b/libclamav/tomsfastmath/mul/fp_mul_comba.c
+@@ -55,7 +55,7 @@ asm(                                                      \
+      "adcl  $0,%2        \n\t"                            \
+      :"=r"(c0), "=r"(c1), "=r"(c2): "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j)  :"%eax","%edx","cc");
+ 
+-#elif defined(TFM_X86_64)
++#elif defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__)
+ /* x86-64 optimized */
+ 
+ /* anything you need at the start */
+diff --git a/libclamav/tomsfastmath/sqr/fp_sqr_comba.c b/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
+--- a/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
++++ b/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
+@@ -83,7 +83,7 @@ asm(                                                     \
+      "adcl %8,%2         \n\t"                            \
+      :"=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
+ 
+-#elif defined(TFM_X86_64)
++#elif defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__)
+ /* x86-64 optimized */
+ 
+ #define COMBA_START
+diff --git a/libclamav/unarj.c b/libclamav/unarj.c
+--- a/libclamav/unarj.c
++++ b/libclamav/unarj.c
+@@ -793,6 +793,7 @@ static int is_arj_archive(arj_metadata_t *metadata)
+ 	const char header_id[2] = {0x60, 0xea};
+ 	const char *mark;
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	mark = fmap_need_off_once(metadata->map, metadata->offset, 2);
+ 	if (!mark)
+ 	    return FALSE;
+@@ -866,6 +867,7 @@ static int arj_read_main_header(arj_metadata_t *metadata)
+ 	metadata->offset += 4; /* crc */
+ 	/* Skip past any extended header data */
+ 	for (;;) {
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	        const uint16_t *countp = fmap_need_off_once(metadata->map, metadata->offset, 2);
+ 		if (!countp)
+ 			return FALSE;
+@@ -953,6 +955,7 @@ static int arj_read_file_header(arj_metadata_t *metadata)
+ 
+ 	/* Skip past any extended header data */
+ 	for (;;) {
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+ 	        const uint16_t *countp = fmap_need_off_once(metadata->map, metadata->offset, 2);
+ 		if (!countp) {
+ 			if(metadata->filename)
+diff --git a/libclamav/version.h b/libclamav/version.h
+--- a/libclamav/version.h
++++ b/libclamav/version.h
+@@ -1 +1 @@
+-#define REPO_VERSION "devel-clamav-0.98.7"
++#define REPO_VERSION "devel-8b4a380"
+diff --git a/libclamav/xar.c b/libclamav/xar.c
+--- a/libclamav/xar.c
++++ b/libclamav/xar.c
+@@ -456,6 +456,7 @@ int cli_scanxar(cli_ctx *ctx)
+     /* cli_dbgmsg("hdr.chksum_alg %i\n", hdr.chksum_alg); */
+  
+     /* Uncompress TOC */
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     strm.next_in = (unsigned char *)fmap_need_off_once(*ctx->fmap, hdr.size, hdr.toc_length_compressed);
+     if (strm.next_in == NULL) {
+         cli_dbgmsg("cli_scanxar: fmap_need_off_once fails on TOC.\n");
+@@ -580,6 +581,7 @@ int cli_scanxar(cli_ctx *ctx)
+                 void * next_in;
+                 unsigned int bytes = MIN(map->len - at, map->pgsz);
+                 bytes = MIN(length, bytes);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+                 if(!(strm.next_in = next_in = (void*)fmap_need_off_once(map, at, bytes))) {
+                     cli_dbgmsg("cli_scanxar: Can't read %u bytes @ %lu.\n", bytes, (long unsigned)at);
+                     inflateEnd(&strm);
+@@ -650,6 +652,7 @@ int cli_scanxar(cli_ctx *ctx)
+                     
+                 }
+ 
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+                 blockp = (void*)fmap_need_off_once(map, at, CLI_LZMA_HDR_SIZE);
+                 if (blockp == NULL) {
+                     char errbuff[128];
+@@ -687,6 +690,7 @@ int cli_scanxar(cli_ctx *ctx)
+                     lz.next_out = buff;
+                     lz.avail_out = CLI_LZMA_OBUF_SIZE;
+                     lz.avail_in = avail_in = MIN(CLI_LZMA_IBUF_SIZE, in_remaining);
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+                     lz.next_in = next_in = (void*)fmap_need_off_once(map, at, lz.avail_in);
+                     if (lz.next_in == NULL) {
+                         char errbuff[128];
+@@ -763,6 +767,7 @@ int cli_scanxar(cli_ctx *ctx)
+                 else
+                     write_len = length;
+                     
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+                 if (!(blockp = (void*)fmap_need_off_once(map, at, length))) {
+                     char errbuff[128];
+                     cli_strerror(errno, errbuff, sizeof(errbuff));
+diff --git a/libclamav/xdp.c b/libclamav/xdp.c
+--- a/libclamav/xdp.c
++++ b/libclamav/xdp.c
+@@ -109,6 +109,7 @@ int cli_scanxdp(cli_ctx *ctx)
+     char *dumpname;
+     size_t i;
+     
++			fprintf(stderr, "TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     buf = (const char *)fmap_need_off_once(map, map->offset, map->len);
+     if (!(buf))
+         return CL_EREAD;
+diff --git a/shared/misc.c b/shared/misc.c
+--- a/shared/misc.c
++++ b/shared/misc.c
+@@ -249,7 +249,7 @@ int filecopy(const char *src, const char *dest)
+ 
+ int daemonize(void)
+ {
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+     fputs("Background mode is not supported on your operating system\n", stderr);
+     return -1;
+ #else
+diff --git a/shared/optparser.c b/shared/optparser.c
+--- a/shared/optparser.c
++++ b/shared/optparser.c
+@@ -63,6 +63,8 @@ const struct clam_option __clam_options[] = {
+     /* name,   longopt, sopt, argtype, regex, num, str, flags, owner, description, suggested */
+ 
+     /* cmdline only */
++    { NULL, "output-app-label", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMSCAN, "output app label", "" },
++    { NULL, "for-nacl-pipeline", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMSCAN, "for pipeline", "" },
+     { NULL, "help", 'h', CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_FRESHCLAM | OPT_CLAMSCAN | OPT_CLAMDSCAN | OPT_SIGTOOL | OPT_MILTER | OPT_CLAMCONF | OPT_CLAMDTOP | OPT_CLAMBC, "", "" },
+     { NULL, "config-file", 'c', CLOPT_TYPE_STRING, NULL, 0, CONFDIR_CLAMD, FLAG_REQUIRED, OPT_CLAMD | OPT_CLAMDSCAN | OPT_CLAMDTOP, "", "" },
+     { NULL, "config-file", 0, CLOPT_TYPE_STRING, NULL, 0, CONFDIR_FRESHCLAM, FLAG_REQUIRED, OPT_FRESHCLAM, "", "" },
+@@ -285,13 +287,13 @@ const struct clam_option __clam_options[] = {
+     /* Scan options */
+     { "Bytecode", "bytecode", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 1, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, "With this option enabled ClamAV will load bytecode from the database. It is highly recommended you keep this option on, otherwise you'll miss detections for many new viruses.", "yes" },
+ 
+-    { "BytecodeSecurity", NULL, 0, CLOPT_TYPE_STRING, "^(TrustSigned|Paranoid)$", -1, "TrustSigned", 0, OPT_CLAMD, 
++    { "BytecodeSecurity", NULL, 0, CLOPT_TYPE_STRING, "^(TrustSigned|Paranoid)$", -1, "TrustSigned", 0, OPT_CLAMD,
+ 	"Set bytecode security level.\nPossible values:\n\tTrustSigned - trust bytecode loaded from signed .c[lv]d files,\n\t\t insert runtime safety checks for bytecode loaded from other sources\n\tParanoid - don't trust any bytecode, insert runtime checks for all\nRecommended: TrustSigned, because bytecode in .cvd files already has these checks.","TrustSigned"},
+ 
+-    { "BytecodeTimeout", "bytecode-timeout", 0, CLOPT_TYPE_NUMBER, MATCH_NUMBER, 5000, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, 
++    { "BytecodeTimeout", "bytecode-timeout", 0, CLOPT_TYPE_NUMBER, MATCH_NUMBER, 5000, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN,
+ 	"Set bytecode timeout in miliseconds.","5000"},
+ 
+-    { "BytecodeUnsigned", "bytecode-unsigned", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, 
++    { "BytecodeUnsigned", "bytecode-unsigned", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN,
+ 	"Allow loading bytecode from outside digitally signed .c[lv]d files.","no"},
+ 
+     { "BytecodeMode", "bytecode-mode", 0, CLOPT_TYPE_STRING, "^(Auto|ForceJIT|ForceInterpreter|Test)$", -1, "Auto", FLAG_REQUIRED, OPT_CLAMD | OPT_CLAMSCAN,
+@@ -1156,39 +1158,39 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+ 	long long numarg, lnumarg;
+ 	int regflags = REG_EXTENDED | REG_NOSUB;
+     const struct clam_option *optentry = NULL;
+-    
++
+     if(oldopts)
+         opts = oldopts;
+-    
+-    
++
++
+     for(i = 0; ; i++) {
+         optentry = &clam_options[i];
+         if(!optentry->name && !optentry->longopt)
+             break;
+-        
++
+         if(((optentry->owner & toolmask) && ((optentry->owner & toolmask) != OPT_DEPRECATED)) || (ignore && (optentry->owner & ignore))) {
+             if(!oldopts && optadd(&opts, &opts_last, optentry->name, optentry->longopt, optentry->strarg, optentry->numarg, optentry->flags, i) < 0) {
+                 fprintf(stderr, "ERROR: optparse: Can't register new option (not enough memory)\n");
+                 optfree(opts);
+                 return NULL;
+             }
+-            
++
+         }
+     }
+-    
++
+     if(MAX(sc, lc) > MAXCMDOPTS) {
+ 	    fprintf(stderr, "ERROR: optparse: (short|long)opts[] is too small\n");
+ 	    optfree(opts);
+ 	    return NULL;
+ 	}
+-    
++
+     while(1) {
+         if(!name) {
+             fprintf(stderr, "ERROR: Problem parsing options (name == NULL)\n");
+             err = 1;
+             break;
+         }
+-        
++
+         opt = optget_i(opts, name);
+         if(!opt) {
+             if(verbose)
+@@ -1197,13 +1199,13 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+             break;
+         }
+         optentry = &clam_options[opt->idx];
+-        
++
+         if(ignore && (optentry->owner & ignore) && !(optentry->owner & toolmask)) {
+             if(verbose)
+                 fprintf(stderr, "WARNING: Ignoring unsupported option %s at line %u\n", opt->name, line);
+             continue;
+         }
+-        
++
+         if(optentry->owner & OPT_DEPRECATED) {
+             if(toolmask & OPT_DEPRECATED) {
+                 if(optaddarg(opts, name, "foo", 1) < 0) {
+@@ -1217,11 +1219,11 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+             }
+             continue;
+         }
+-        
++
+         if(optentry->regex) {
+             if(!(optentry->flags & FLAG_REG_CASE))
+                 regflags |= REG_ICASE;
+-            
++
+             if(cli_regcomp(&regex, optentry->regex, regflags)) {
+                 fprintf(stderr, "ERROR: optparse: Can't compile regular expression %s for option %s\n", optentry->regex, name);
+                 err = 1;
+@@ -1235,15 +1237,15 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                 break;
+             }
+         }
+-        
++
+         numarg = -1;
+         switch(optentry->argtype) {
+             case CLOPT_TYPE_STRING:
+                 if(!arg)
+                     arg = optentry->strarg;
+-                
++
+                 break;
+-                
++
+             case CLOPT_TYPE_NUMBER:
+                 if (arg)
+                     numarg = atoi(arg);
+@@ -1251,7 +1253,7 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                     numarg = 0;
+                 arg = NULL;
+                 break;
+-                
++
+             case CLOPT_TYPE_SIZE:
+                 errno = 0;
+                 if(arg)
+@@ -1279,41 +1281,41 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                             err = 1;
+                     }
+                 }
+-                
++
+                 arg = NULL;
+                 if(err) break;
+                 if(errno == ERANGE) {
+                     fprintf(stderr, "WARNING: Numerical value for option %s too high, resetting to 4G\n", name);
+                     lnumarg = UINT_MAX;
+                 }
+-                
++
+                 numarg = lnumarg ? lnumarg : UINT_MAX;
+                 break;
+-                
++
+             case CLOPT_TYPE_BOOL:
+                 if(!strcasecmp(arg, "yes") || !strcmp(arg, "1") || !strcasecmp(arg, "true"))
+                     numarg = 1;
+                 else
+                     numarg = 0;
+-                
++
+                 arg = NULL;
+                 break;
+         }
+-        
++
+         if(err)
+             break;
+-        
++
+         if(optaddarg(opts, name, arg, numarg) < 0) {
+             fprintf(stderr, "ERROR: Can't register argument for option --%s\n", optentry->longopt);
+             err = 1;
+         }
+         break;
+     }
+-    
++
+     if(err) {
+         optfree(opts);
+         return NULL;
+     }
+-      
++
+     return opts;
+ }
+diff --git a/shared/output.c b/shared/output.c
+--- a/shared/output.c
++++ b/shared/output.c
+@@ -316,7 +316,7 @@ int logg(const char *str, ...)
+ 	time_t currtime;
+ 	size_t len;
+ 	mode_t old_umask;
+-#ifdef F_WRLCK
++#if defined(F_WRLCK) && !defined(__native_client__)
+ 	struct flock fl;
+ #endif
+ 
+@@ -349,9 +349,13 @@ int logg(const char *str, ...)
+     logg_open();
+ 
+     if(!logg_fp && logg_file) {
++#ifndef __native_client__ 
+         old_umask = umask(0037);
++#endif
+         if((logg_fp = fopen(logg_file, "at")) == NULL) {
++#ifndef __native_client__
+             umask(old_umask);
++#endif
+ #ifdef CL_THREAD_SAFE
+             pthread_mutex_unlock(&logg_mutex);
+ #endif
+@@ -359,9 +363,11 @@ int logg(const char *str, ...)
+             if(len > sizeof(buffer))
+                 free(abuffer);
+             return -1;
+-        } else umask(old_umask);
+-
+-#ifdef F_WRLCK
++        }
++#ifndef __native_client__ 
++	else umask(old_umask);
++#endif
++#if defined(F_WRLCK) && !defined(__native_client__)
+         if(logg_lock) {
+             memset(&fl, 0, sizeof(fl));
+             fl.l_type = F_WRLCK;
+diff --git a/sigtool/sigtool.c b/sigtool/sigtool.c
+--- a/sigtool/sigtool.c
++++ b/sigtool/sigtool.c
+@@ -2882,6 +2882,7 @@ static int dumpcerts(const struct optstruct *opts)
+ 	return -1;
+     }
+ 
++			fprintf("TRACE %s:%d\n", __FUNCTION__, __LINE__);
+     fmptr = fmap_need_off_once(*ctx.fmap, 0, sb.st_size);
+     if(!fmptr) {
+         mprintf("!dumpcerts: fmap_need_off_once failed!\n");
+diff --git a/unit_tests/Makefile.in b/unit_tests/Makefile.in
+--- a/unit_tests/Makefile.in
++++ b/unit_tests/Makefile.in
+@@ -508,9 +508,10 @@ top_srcdir = @top_srcdir@
+ SPLIT_DIR = $(top_srcdir)/unit_tests/.split
+ FILES = clam-phish-exe
+ programs = check_clamav
+-scripts = check_freshclam.sh check_sigtool.sh check_unit_vg.sh check1_clamscan.sh check2_clamd.sh check3_clamd.sh check4_clamd.sh\
+-	  check5_clamd_vg.sh check6_clamd_vg.sh check7_clamd_hg.sh check8_clamd_hg.sh check9_clamscan_vg.sh
+-
++scripts = check_freshclam.sh check_sigtool.sh check_unit_vg.sh check1_clamscan.sh \
++check5_clamd_vg.sh check6_clamd_vg.sh check7_clamd_hg.sh check8_clamd_hg.sh check9_clamscan_vg.sh
++#check2_clamd.sh check3_clamd.sh check4_clamd.sh\
++	  
+ utils = check_fpu_endian
+ TESTS_ENVIRONMENT = export abs_srcdir=$(abs_srcdir) AWK=$(AWK); \
+ 	$(am__append_1)
+@@ -1003,7 +1004,11 @@ check-html recheck-html:
+ 	$(MAKE) $(AM_MAKEFLAGS) $(TEST_SUITE_HTML) TEST_LOGS= || exit 4; \
+ 	exit $$rv
+ check_clamav.log: check_clamav$(EXEEXT)
+-	@p='check_clamav$(EXEEXT)'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++ifneq ($(wildcard .libs/check_clamav.nexe), )
++	@p='.libs/test_check_clamav'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++else
++	p='test_check_clamav'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++endif
+ check_freshclam.sh.log: check_freshclam.sh
+ 	@p='check_freshclam.sh'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
+ check_sigtool.sh.log: check_sigtool.sh
+diff --git a/unit_tests/check_clamav.c b/unit_tests/check_clamav.c
+--- a/unit_tests/check_clamav.c
++++ b/unit_tests/check_clamav.c
+@@ -491,7 +491,26 @@ static int get_test_file(int i, char *file, unsigned fsize, unsigned long *size)
+ 
+ static off_t pread_cb(void *handle, void *buf, size_t count, off_t offset)
+ {
++#ifdef __native_client__
++    int fd = *((int*)handle); 
++    off_t cur_pos;
++    ssize_t num_read;
++
++    if ((cur_pos = lseek(fd, 0, SEEK_CUR)) == (off_t)-1)
++        return -1;
++
++    if (lseek(fd, offset, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    num_read = read(fd, buf, count);
++
++    if (lseek(fd, cur_pos, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    return num_read;
++#else
+     return pread(*((int*)handle), buf, count, offset);
++#endif
+ }
+ 
+ START_TEST (test_cl_scanmap_callback_handle)
+diff --git a/unit_tests/check_clamd.c b/unit_tests/check_clamd.c
+--- a/unit_tests/check_clamd.c
++++ b/unit_tests/check_clamd.c
+@@ -51,7 +51,14 @@
+ #include "libclamav/version.h"
+ #include "libclamav/cltypes.h"
+ 
+-#ifdef CHECK_HAVE_LOOPS
++#ifdef __native_client__
++int main(void)
++{
++    puts("\n*** Native client cannot create socket, clamd tests not run!\n");
++    /* tell automake the test was skipped */
++    return 77;
++}
++#elif defined(CHECK_HAVE_LOOPS)
+ 
+ static int sockd;
+ #define SOCKET "clamd-test.socket"
+diff --git a/unit_tests/check_common.sh b/unit_tests/check_common.sh
+--- a/unit_tests/check_common.sh
++++ b/unit_tests/check_common.sh
+@@ -7,14 +7,30 @@
+ 
+ WRAPPER=${WRAPPER-}
+ TOP=`pwd`/..
+-CLAMSCAN=$TOP/clamscan/clamscan
+-CLAMD=$TOP/clamd/clamd
+-CHECK_CLAMD=$TOP/unit_tests/check_clamd
+-CLAMDSCAN=$TOP/clamdscan/clamdscan
++if [ -f $TOP/clamscan/.libs/clamscan.nexe ]; then
++    CLAMSCAN=$TOP/clamscan/.libs/test_clamscan
++else
++    CLAMSCAN=$TOP/clamscan/clamscan
++fi
++if [ -f $TOP/clamscan/.libs/clamscan.nexe ]; then
++    CLAMD=$TOP/clamd/.libs/test_clamd
++else
++    CLAMD=$TOP/clamd/clamd
++fi
++CHECK_CLAMD=$TOP/unit_tests/test_check_clamd
++if [ -f $TOP/clamdscan/.libs/clamdscan.nexe ]; then
++    CLAMDSCAN=$TOP/clamdscan/.libs/test_clamdscan
++else
++    CLAMDSCAN=$TOP/clamdscan/clamdscan
++fi
+ TESTFILES=$TOP/test/clam*
+ NFILES=`ls -1 $TESTFILES | wc -l`
+ #CHECK_FPU_ENDIAN=$TOP/unit_tests/.libs/lt-check_fpu_endian
+-CHECK_FPU_ENDIAN=$TOP/unit_tests/check_fpu_endian
++if [ -f $TOP/unit_tests/.libs/check_fpu_endian.nexe ]; then
++    CHECK_FPU_ENDIAN=$TOP/unit_tests/.libs/test_check_fpu_endian
++else
++    CHECK_FPU_ENDIAN=$TOP/unit_tests/test_check_fpu_endian
++fi
+ 
+ killclamd() {
+     test -f clamd-test.pid &&
+@@ -49,8 +65,9 @@ die()
+ 
+ # Setup test directory to avoid temporary and output file clashes
+ test_start() {
+-    ulimit -t 120 || true; ulimit -d 1024000 || true;
+-    ulimit -v 1024000 || true;
++# Nacl tries to mmap 88G...
++#    ulimit -t 120 || true; ulimit -d 1024000 || true;
++#    ulimit -v 1024000 || true;
+     (cd test-$1 2>/dev/null && killclamd || true)
+     rm -rf test-$1
+     mkdir test-$1
+@@ -94,21 +111,25 @@ test_run() {
+    expected=$1
+    shift
+    set +e
+-   $TOP/libtool --mode=execute $WRAPPER $*
++   set -x
++   $*
+    val=$?
+    if test $val -ne $expected; then
+        error "Failed to run $*, expected $expected exitcode, but was $val" >&2;
+        return 0;
+    fi
+    set -e
++   set +x
+    return 1;
+ }
+ 
+ # Run a test and return its exitcode
+ test_run_check() {
+     set +e
+-    $TOP/libtool --mode=execute $WRAPPER $*
++    set -x
++    $*
+     val=$?
++    set +x
+     set -e
+     return $?;
+ }
+diff --git a/unit_tests/check_freshclam.sh b/unit_tests/check_freshclam.sh
+--- a/unit_tests/check_freshclam.sh
++++ b/unit_tests/check_freshclam.sh
+@@ -1,2 +1,6 @@
+ #!/bin/sh
+-../freshclam/freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++if [ -f ../freshclam/.libs/freshclam.nexe ]; then
++    ../freshclam/.libs/test_freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++else
++    ../freshclam/freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++fi
+diff --git a/unit_tests/check_sigtool.sh b/unit_tests/check_sigtool.sh
+--- a/unit_tests/check_sigtool.sh
++++ b/unit_tests/check_sigtool.sh
+@@ -1,2 +1,6 @@
+ #!/bin/sh
+-../sigtool/sigtool -V >/dev/null
++if [ -f ../sigtool/.libs/sigtool.nexe ]; then
++    ../sigtool/.libs/test_sigtool -V >/dev/null
++else
++    ../sigtool/sigtool -V >/dev/null
++fi
+diff --git a/unit_tests/check_unit_vg.sh b/unit_tests/check_unit_vg.sh
+--- a/unit_tests/check_unit_vg.sh
++++ b/unit_tests/check_unit_vg.sh
+@@ -2,7 +2,7 @@
+ . $srcdir/check_common.sh
+ init_valgrind
+ export CK_FORK=no WRAPPER="$VALGRIND $VALGRIND_FLAGS" CK_DEFAULT_TIMEOUT=40
+-if test_run 0 $TOP/unit_tests/check_clamav; then
++if test_run 0 $TOP/unit_tests/.libs/test_check_clamav; then
+     echo "check_clamav failed to run" >&2
+ fi
+ end_valgrind
+diff --git a/win32/compat/utf8_util.c b/win32/compat/utf8_util.c
+--- a/win32/compat/utf8_util.c
++++ b/win32/compat/utf8_util.c
+@@ -34,6 +34,7 @@ char *cli_strdup_to_utf8(const char *s) {
+ #define MAYBE_FREE_W do { if(wdup != tmpw) free(wdup); } while (0)
+ #define MAYBE_FREE_U do { if(utf8 != tmpu) free(utf8); } while (0)
+ char *cli_to_utf8_maybe_alloc(const char *s) {
++	TRACE();
+     int len = strlen(s) + 1;
+     wchar_t tmpw[1024], *wdup;
+     char tmpu[1024], *utf8;
+@@ -46,6 +47,7 @@ char *cli_to_utf8_maybe_alloc(const char *s) {
+ 
+     /* Check if already UTF8 first... */
+     if(MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, s, -1, wdup, len)) {
++	TRACE();
+ 	/* XP acts funny on MB_ERR_INVALID_CHARS, so we translate back and compare
+ 	   On Vista+ the flag is honored and there is no such overhead */
+ 	int ulen;
+@@ -70,6 +72,7 @@ char *cli_to_utf8_maybe_alloc(const char *s) {
+ 
+     /* ... then assume ANSI */
+     if(MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, s, -1, wdup, len)) {
++	TRACE();
+ 	if((len = WideCharToMultiByte(CP_UTF8, 0, wdup, -1, NULL, 0, NULL, NULL))) {
+ 	    if((utf8 = (char *)malloc(len))) {
+ 		if(WideCharToMultiByte(CP_UTF8, 0, wdup, -1, utf8, len, NULL, NULL)) {

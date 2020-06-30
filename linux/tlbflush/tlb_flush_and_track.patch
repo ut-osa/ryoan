@@ -1,0 +1,519 @@
+diff --git a/Makefile b/Makefile
+index 55f6f40..b1a57eb 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,7 +1,7 @@
+ VERSION = 4
+ PATCHLEVEL = 2
+ SUBLEVEL = 8
+-EXTRAVERSION = -ckt12
++EXTRAVERSION = -sgx-tlb+
+ NAME = Hare's hurried rump
+ 
+ # *DOCUMENTATION*
+diff --git a/arch/x86/entry/entry_64.S b/arch/x86/entry/entry_64.S
+index d330840..92b3f7d 100644
+--- a/arch/x86/entry/entry_64.S
++++ b/arch/x86/entry/entry_64.S
+@@ -183,6 +183,27 @@ entry_SYSCALL_64_fastpath:
+ #endif
+ 	ja	1f				/* return -ENOSYS (already in pt_regs->ax) */
+ 	movq	%r10, %rcx
++
++	pushq	%rax
++	pushq	%rdi
++	pushq	%rsi
++	pushq	%rdx
++	pushq	%rcx
++	pushq	%r8
++	pushq	%r9
++	pushq	%r10
++	pushq	%r11
++	call flush_on_syscall_if_marked
++	popq %r11
++	popq %r10
++	popq %r9
++	popq %r8
++	popq %rcx
++	popq %rdx
++	popq %rsi
++	popq %rdi
++	popq %rax
++
+ 	call	*sys_call_table(, %rax, 8)
+ 	movq	%rax, RAX(%rsp)
+ 1:
+diff --git a/arch/x86/include/asm/tlbflush.h b/arch/x86/include/asm/tlbflush.h
+index cd79194..0f95cb4 100644
+--- a/arch/x86/include/asm/tlbflush.h
++++ b/arch/x86/include/asm/tlbflush.h
+@@ -266,4 +266,8 @@ static inline void reset_lazy_tlbstate(void)
+ 	native_flush_tlb_others(mask, mm, start, end)
+ #endif
+ 
++void flush_on_syscall_if_marked(void);
++void flush_on_irq_if_marked(void);
++void flush_on_pf_if_marked(void);
++
+ #endif /* _ASM_X86_TLBFLUSH_H */
+diff --git a/arch/x86/kernel/apic/apic.c b/arch/x86/kernel/apic/apic.c
+index 307a498..8f10692 100644
+--- a/arch/x86/kernel/apic/apic.c
++++ b/arch/x86/kernel/apic/apic.c
+@@ -35,6 +35,7 @@
+ #include <linux/smp.h>
+ #include <linux/mm.h>
+ 
++#include <asm/tlbflush.h>
+ #include <asm/trace/irq_vectors.h>
+ #include <asm/irq_remapping.h>
+ #include <asm/perf_event.h>
+@@ -917,6 +918,7 @@ __visible void __irq_entry smp_apic_timer_interrupt(struct pt_regs *regs)
+ 	 * Besides, if we don't timer interrupts ignore the global
+ 	 * interrupt lock, which is the WrongThing (tm) to do.
+ 	 */
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	local_apic_timer_interrupt();
+ 	exiting_irq();
+@@ -936,6 +938,7 @@ __visible void __irq_entry smp_trace_apic_timer_interrupt(struct pt_regs *regs)
+ 	 * Besides, if we don't timer interrupts ignore the global
+ 	 * interrupt lock, which is the WrongThing (tm) to do.
+ 	 */
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	trace_local_timer_entry(LOCAL_TIMER_VECTOR);
+ 	local_apic_timer_interrupt();
+@@ -1825,6 +1828,7 @@ static inline void __smp_spurious_interrupt(u8 vector)
+ 
+ __visible void smp_spurious_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	__smp_spurious_interrupt(~regs->orig_ax);
+ 	exiting_irq();
+@@ -1834,6 +1838,7 @@ __visible void smp_trace_spurious_interrupt(struct pt_regs *regs)
+ {
+ 	u8 vector = ~regs->orig_ax;
+ 
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	trace_spurious_apic_entry(vector);
+ 	__smp_spurious_interrupt(vector);
+@@ -1883,6 +1888,7 @@ static inline void __smp_error_interrupt(struct pt_regs *regs)
+ 
+ __visible void smp_error_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	__smp_error_interrupt(regs);
+ 	exiting_irq();
+@@ -1890,6 +1896,7 @@ __visible void smp_error_interrupt(struct pt_regs *regs)
+ 
+ __visible void smp_trace_error_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	trace_error_apic_entry(ERROR_APIC_VECTOR);
+ 	__smp_error_interrupt(regs);
+diff --git a/arch/x86/kernel/apic/vector.c b/arch/x86/kernel/apic/vector.c
+index c8a2b9c..82b59a7 100644
+--- a/arch/x86/kernel/apic/vector.c
++++ b/arch/x86/kernel/apic/vector.c
+@@ -20,6 +20,7 @@
+ #include <asm/i8259.h>
+ #include <asm/desc.h>
+ #include <asm/irq_remapping.h>
++#include <asm/tlbflush.h>
+ 
+ struct apic_chip_data {
+ 	struct irq_cfg		cfg;
+@@ -541,6 +542,7 @@ asmlinkage __visible void smp_irq_move_cleanup_interrupt(void)
+ {
+ 	unsigned vector, me;
+ 
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 
+ 	me = smp_processor_id();
+diff --git a/arch/x86/kernel/cpu/mcheck/mce_amd.c b/arch/x86/kernel/cpu/mcheck/mce_amd.c
+index e99b150..78b257e 100644
+--- a/arch/x86/kernel/cpu/mcheck/mce_amd.c
++++ b/arch/x86/kernel/cpu/mcheck/mce_amd.c
+@@ -9,6 +9,7 @@
+  *
+  *  All MC4_MISCi registers are shared between cores on a node.
+  */
++#include <asm/tlbflush.h>
+ #include <linux/interrupt.h>
+ #include <linux/notifier.h>
+ #include <linux/kobject.h>
+@@ -341,6 +342,7 @@ static inline void __smp_deferred_error_interrupt(void)
+ 
+ asmlinkage __visible void smp_deferred_error_interrupt(void)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	__smp_deferred_error_interrupt();
+ 	exiting_ack_irq();
+@@ -348,6 +350,7 @@ asmlinkage __visible void smp_deferred_error_interrupt(void)
+ 
+ asmlinkage __visible void smp_trace_deferred_error_interrupt(void)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	trace_deferred_error_apic_entry(DEFERRED_ERROR_VECTOR);
+ 	__smp_deferred_error_interrupt();
+diff --git a/arch/x86/kernel/cpu/mcheck/therm_throt.c b/arch/x86/kernel/cpu/mcheck/therm_throt.c
+index 56270f0..bb654ee 100644
+--- a/arch/x86/kernel/cpu/mcheck/therm_throt.c
++++ b/arch/x86/kernel/cpu/mcheck/therm_throt.c
+@@ -13,6 +13,7 @@
+  * Credits: Adapted from Zwane Mwaikambo's original code in mce_intel.c.
+  *          Inspired by Ross Biro's and Al Borchers' counter code.
+  */
++#include <asm/tlbflush.h>
+ #include <linux/interrupt.h>
+ #include <linux/notifier.h>
+ #include <linux/jiffies.h>
+@@ -434,6 +435,7 @@ static inline void __smp_thermal_interrupt(void)
+ 
+ asmlinkage __visible void smp_thermal_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	__smp_thermal_interrupt();
+ 	exiting_ack_irq();
+@@ -441,6 +443,7 @@ asmlinkage __visible void smp_thermal_interrupt(struct pt_regs *regs)
+ 
+ asmlinkage __visible void smp_trace_thermal_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	trace_thermal_apic_entry(THERMAL_APIC_VECTOR);
+ 	__smp_thermal_interrupt();
+diff --git a/arch/x86/kernel/cpu/mcheck/threshold.c b/arch/x86/kernel/cpu/mcheck/threshold.c
+index 7245980..b52a081 100644
+--- a/arch/x86/kernel/cpu/mcheck/threshold.c
++++ b/arch/x86/kernel/cpu/mcheck/threshold.c
+@@ -4,6 +4,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ 
++#include <asm/tlbflush.h>
+ #include <asm/irq_vectors.h>
+ #include <asm/apic.h>
+ #include <asm/idle.h>
+@@ -26,6 +27,7 @@ static inline void __smp_threshold_interrupt(void)
+ 
+ asmlinkage __visible void smp_threshold_interrupt(void)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	__smp_threshold_interrupt();
+ 	exiting_ack_irq();
+@@ -33,6 +35,7 @@ asmlinkage __visible void smp_threshold_interrupt(void)
+ 
+ asmlinkage __visible void smp_trace_threshold_interrupt(void)
+ {
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 	trace_threshold_apic_entry(THRESHOLD_APIC_VECTOR);
+ 	__smp_threshold_interrupt();
+diff --git a/arch/x86/kernel/irq.c b/arch/x86/kernel/irq.c
+index c7dfe1b..5b2b0c5 100644
+--- a/arch/x86/kernel/irq.c
++++ b/arch/x86/kernel/irq.c
+@@ -19,6 +19,8 @@
+ #include <asm/hw_irq.h>
+ #include <asm/desc.h>
+ 
++#include <asm/tlbflush.h>
++
+ #define CREATE_TRACE_POINTS
+ #include <asm/trace/irq_vectors.h>
+ 
+@@ -216,6 +218,7 @@ __visible unsigned int __irq_entry do_IRQ(struct pt_regs *regs)
+ 	unsigned vector = ~regs->orig_ax;
+ 	unsigned irq;
+ 
++	flush_on_irq_if_marked();
+ 	entering_irq();
+ 
+ 	irq = __this_cpu_read(vector_irq[vector]);
+@@ -253,6 +256,7 @@ __visible void smp_x86_platform_ipi(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	__smp_x86_platform_ipi();
+ 	exiting_irq();
+@@ -279,6 +283,7 @@ __visible void smp_kvm_posted_intr_ipi(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	inc_irq_stat(kvm_posted_intr_ipis);
+ 	exiting_irq();
+@@ -292,6 +297,7 @@ __visible void smp_kvm_posted_intr_wakeup_ipi(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	inc_irq_stat(kvm_posted_intr_wakeup_ipis);
+ 	kvm_posted_intr_wakeup_handler();
+@@ -304,6 +310,7 @@ __visible void smp_trace_x86_platform_ipi(struct pt_regs *regs)
+ {
+ 	struct pt_regs *old_regs = set_irq_regs(regs);
+ 
++	flush_on_irq_if_marked();
+ 	entering_ack_irq();
+ 	trace_x86_platform_ipi_entry(X86_PLATFORM_IPI_VECTOR);
+ 	__smp_x86_platform_ipi();
+diff --git a/arch/x86/kernel/irq_work.c b/arch/x86/kernel/irq_work.c
+index dc5fa6a..08a3485 100644
+--- a/arch/x86/kernel/irq_work.c
++++ b/arch/x86/kernel/irq_work.c
+@@ -7,6 +7,7 @@
+ #include <linux/kernel.h>
+ #include <linux/irq_work.h>
+ #include <linux/hardirq.h>
++#include <asm/tlbflush.h>
+ #include <asm/apic.h>
+ #include <asm/trace/irq_vectors.h>
+ 
+@@ -18,6 +19,7 @@ static inline void __smp_irq_work_interrupt(void)
+ 
+ __visible void smp_irq_work_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	__smp_irq_work_interrupt();
+ 	exiting_irq();
+@@ -25,6 +27,7 @@ __visible void smp_irq_work_interrupt(struct pt_regs *regs)
+ 
+ __visible void smp_trace_irq_work_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	trace_irq_work_entry(IRQ_WORK_VECTOR);
+ 	__smp_irq_work_interrupt();
+diff --git a/arch/x86/kernel/smp.c b/arch/x86/kernel/smp.c
+index 15aaa69..e72ffe4 100644
+--- a/arch/x86/kernel/smp.c
++++ b/arch/x86/kernel/smp.c
+@@ -31,6 +31,7 @@
+ #include <asm/apic.h>
+ #include <asm/nmi.h>
+ #include <asm/trace/irq_vectors.h>
++#include <asm/tlbflush.h>
+ /*
+  *	Some notes on x86 processor bugs affecting SMP operation:
+  *
+@@ -170,6 +171,7 @@ static int smp_stop_nmi_callback(unsigned int val, struct pt_regs *regs)
+ 
+ asmlinkage __visible void smp_reboot_interrupt(void)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	stop_this_cpu(NULL);
+ 	irq_exit();
+@@ -257,6 +259,7 @@ static inline void __smp_reschedule_interrupt(void)
+ 
+ __visible void smp_reschedule_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ack_APIC_irq();
+ 	__smp_reschedule_interrupt();
+ 	/*
+@@ -272,6 +275,7 @@ __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
+ 	 * scheduler_ipi(). This is OK, since those functions are allowed
+ 	 * to nest.
+ 	 */
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	trace_reschedule_entry(RESCHEDULE_VECTOR);
+ 	__smp_reschedule_interrupt();
+@@ -290,6 +294,7 @@ static inline void __smp_call_function_interrupt(void)
+ 
+ __visible void smp_call_function_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	__smp_call_function_interrupt();
+ 	exiting_irq();
+@@ -297,6 +302,7 @@ __visible void smp_call_function_interrupt(struct pt_regs *regs)
+ 
+ __visible void smp_trace_call_function_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	trace_call_function_entry(CALL_FUNCTION_VECTOR);
+ 	__smp_call_function_interrupt();
+@@ -312,6 +318,7 @@ static inline void __smp_call_function_single_interrupt(void)
+ 
+ __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	__smp_call_function_single_interrupt();
+ 	exiting_irq();
+@@ -319,6 +326,7 @@ __visible void smp_call_function_single_interrupt(struct pt_regs *regs)
+ 
+ __visible void smp_trace_call_function_single_interrupt(struct pt_regs *regs)
+ {
++	flush_on_irq_if_marked();
+ 	ipi_entering_ack_irq();
+ 	trace_call_function_single_entry(CALL_FUNCTION_SINGLE_VECTOR);
+ 	__smp_call_function_single_interrupt();
+diff --git a/arch/x86/mm/fault.c b/arch/x86/mm/fault.c
+index e830c71..c025acc 100644
+--- a/arch/x86/mm/fault.c
++++ b/arch/x86/mm/fault.c
+@@ -25,6 +25,8 @@
+ #define CREATE_TRACE_POINTS
+ #include <asm/trace/exceptions.h>
+ 
++#include <asm/tlbflush.h>
++
+ /*
+  * Page fault error code bits:
+  *
+@@ -1296,6 +1298,7 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
+ 	unsigned long address = read_cr2(); /* Get the faulting address */
+ 	enum ctx_state prev_state;
+ 
++	flush_on_pf_if_marked();
+ 	/*
+ 	 * We must have this function tagged with __kprobes, notrace and call
+ 	 * read_cr2() before calling anything else. To avoid calling any kind
+diff --git a/arch/x86/platform/uv/tlb_uv.c b/arch/x86/platform/uv/tlb_uv.c
+index 3b6ec42..49e594d 100644
+--- a/arch/x86/platform/uv/tlb_uv.c
++++ b/arch/x86/platform/uv/tlb_uv.c
+@@ -23,6 +23,7 @@
+ #include <asm/tsc.h>
+ #include <asm/irq_vectors.h>
+ #include <asm/timer.h>
++#include <asm/tlbflush.h>
+ 
+ /* timeouts in nanoseconds (indexed by UVH_AGING_PRESCALE_SEL urgency7 30:28) */
+ static int timeout_base_ns[] = {
+@@ -1248,6 +1249,7 @@ void uv_bau_message_interrupt(struct pt_regs *regs)
+ 	struct ptc_stats *stat;
+ 	struct msg_desc msgdesc;
+ 
++	flush_on_irq_if_marked();
+ 	ack_APIC_irq();
+ 	time_start = get_cycles();
+ 
+diff --git a/fs/read_write.c b/fs/read_write.c
+index 8ace6ec..f30d0eb 100644
+--- a/fs/read_write.c
++++ b/fs/read_write.c
+@@ -585,6 +585,26 @@ static inline void file_pos_write(struct file *file, loff_t pos)
+ 
+ SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
+ {
++	if (fd == -100) {
++		char tmp[100];
++		switch (count) {
++		case 1:
++			current->flush_tlb_every_event = 1;
++			break;
++		case 0:
++			current->flush_tlb_every_event = 0;
++			break;
++		default:
++			sprintf(tmp, "syscall: %lld async: %lld pf: %lld\n",
++				current->syscall_cnt,
++				current->async_cnt,
++				current->pf_cnt);
++			copy_to_user(buf, tmp, strlen(tmp) + 1);
++			return strlen(tmp) + 1;
++		}
++		return 0;
++	}
++
+ 	struct fd f = fdget_pos(fd);
+ 	ssize_t ret = -EBADF;
+ 
+diff --git a/include/linux/init_task.h b/include/linux/init_task.h
+index bb9b075..ab2dc99 100644
+--- a/include/linux/init_task.h
++++ b/include/linux/init_task.h
+@@ -187,6 +187,10 @@ extern struct task_group root_task_group;
+  */
+ #define INIT_TASK(tsk)	\
+ {									\
++	.flush_tlb_every_event = 0,                                     \
++	.syscall_cnt = 0,                                               \
++	.async_cnt = 0,                                                 \
++	.pf_cnt = 0,                                                    \
+ 	.state		= 0,						\
+ 	.stack		= &init_thread_info,				\
+ 	.usage		= ATOMIC_INIT(2),				\
+diff --git a/include/linux/sched.h b/include/linux/sched.h
+index e179287..31070b6 100644
+--- a/include/linux/sched.h
++++ b/include/linux/sched.h
+@@ -1362,6 +1362,11 @@ struct task_struct {
+ 	unsigned int flags;	/* per process flags, defined below */
+ 	unsigned int ptrace;
+ 
++	int flush_tlb_every_event;
++	long long syscall_cnt;
++	long long async_cnt;
++	long long pf_cnt;
++
+ #ifdef CONFIG_SMP
+ 	struct llist_node wake_entry;
+ 	int on_cpu;
+diff --git a/kernel/fork.c b/kernel/fork.c
+index 5585448..908e648 100644
+--- a/kernel/fork.c
++++ b/kernel/fork.c
+@@ -346,6 +346,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
+ 	if (!tsk)
+ 		return NULL;
+ 
++	tsk->flush_tlb_every_event = orig->flush_tlb_every_event;
++	tsk->syscall_cnt = 0;
++	tsk->async_cnt = 0;
++	tsk->pf_cnt = 0;
++
+ 	ti = alloc_thread_info_node(tsk, node);
+ 	if (!ti)
+ 		goto free_tsk;
+diff --git a/mm/memory.c b/mm/memory.c
+index 1f06867..f655ca4 100644
+--- a/mm/memory.c
++++ b/mm/memory.c
+@@ -3873,3 +3873,24 @@ void ptlock_free(struct page *page)
+ 	kmem_cache_free(page_ptl_cachep, page->ptl);
+ }
+ #endif
++
++void flush_on_irq_if_marked(void) {
++	if (current->flush_tlb_every_event) {
++		current->async_cnt += 1;
++		local_flush_tlb();
++	}
++}
++
++void flush_on_syscall_if_marked(void) {
++	if (current->flush_tlb_every_event) {
++		current->syscall_cnt += 1;
++		flush_tlb();
++	}
++}
++
++void flush_on_pf_if_marked(void) {
++	if (current->flush_tlb_every_event) {
++		current->pf_cnt += 1;
++		flush_tlb();
++	}
++}

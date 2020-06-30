@@ -1,0 +1,71 @@
+DSPAM_INSTALL=@DSPAM_INSTALL@
+DATA_HOME=@DATA_DIR@
+SHELL:=/bin/bash
+
+DSPAM_LIB=$(DSPAM_INSTALL)/lib/
+
+DSPAM_CONFIG=$(DATA_HOME)/dspam.conf
+DSPAM_LOGDIR=$(DATA_HOME)/log
+DSPAM_DATDIR=$(DATA_HOME)/data
+
+INPUT_FILE_DIR=input
+OUTPUT_FILE_DIR=output
+
+SHARED_SRC=util.c core.c
+SHARED_INC=util.h core.h
+
+SHARED=$(SHARED_SRC) $(SHARED_INC)
+
+CC ?= gcc
+CFLAGS+=-g
+LDFLAGS+=-lc                                 \
+      -Wl,-rpath=$(DSPAM_LIB)                \
+			-L$(DSPAM_LIB)                         \
+			-ldspam -lsqlite3 $(PTHREAD_LIB) -lm -largp \
+      -I$(DSPAM_INSTALL)/include             \
+		  -DCONFIG_DEFAULT=$(DSPAM_CONFIG)			 \
+			-DLOGDIR=$(DSPAM_LOGDIR)
+
+.PHONY: setup clean test scrub
+
+dspam-app$(EXEEXT): dspam-app.c $(SHARED_INC)
+	$(CC) $(CFLAGS) -o dspam-app$(EXEEXT) dspam-app.c $(SHARED_SRC) $(LDFLAGS)
+
+setup: $(DSPAM_CONFIG)
+	mkdir -p $(DSPAM_LOGDIR)
+	mkdir -p $(DSPAM_DATDIR)
+
+# test: setup $(SHARED) $(sort $(patsubst %.sh,%,$(patsubst %.c,%,$(wildcard test*))))
+
+# test:
+# 	build-test
+# 	run-all-tests
+
+build-test: setup $(SHARED) $(patsubst %.c,%,$(wildcard test*.c))
+
+test%:
+	$(CC) $(CFLAGS) -o test$*$(EXEEXT) test$*.c $(SHARED_SRC) $(LDFLAGS)	
+
+run-all-tests:
+	for i in {0..19}; do                                              \
+    echo $$i;                                                       \
+		if [ -e "test$$i.c" ]; then											                \
+			./test$$i < $(INPUT_FILE_DIR)/test$$i.dat || exit 1;		      \
+		elif [ -e "test$$i.sh"  ]; then										              \
+			bash test$$i.sh || exit 1;										                \
+		else																                            \
+			echo "ERR" && exit 1;											                    \
+		fi 						                                                  \
+	done		
+
+clean:
+	rm -f dspam-app \
+	rm -f test \
+	rm -rf $(DSPAM_DATDIR) \
+	rm -rf $(DSPAM_LOGDIR) \
+
+scrub: clean
+	rm -rf autom4te.cache
+	rm -f autoscan.log
+	rm -f config.log
+	rm -f config.status

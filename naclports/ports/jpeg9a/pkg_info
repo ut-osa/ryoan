@@ -1,0 +1,7 @@
+NAME=jpeg9a
+VERSION=9a
+ARCHIVE_ROOT=jpeg-9a
+URL=http://www.ijg.org/files/jpegsrc.v9a.tar.gz
+LICENSE=CUSTOM:README
+SHA1=d65ed6f88d318f7380a3a5f75d578744e732daca
+DISABLED_TOOLCHAIN=(emscripten)

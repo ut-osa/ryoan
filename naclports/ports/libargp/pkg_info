@@ -1,0 +1,3 @@
+NAME=libargp
+VERSION=0.1
+DEPENDS=(glibc-compat)

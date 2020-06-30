@@ -1,0 +1,4 @@
+NAME=opencv-pipeline
+VERSION=0.1
+DEPENDS=(opencv libpipeline xz enclave-header openssl)
+DISABLED_TOOLCHAIN=(emscripten)

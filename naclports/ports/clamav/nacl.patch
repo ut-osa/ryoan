@@ -1,0 +1,1411 @@
+diff --git a/clamd/clamd.c b/clamd/clamd.c
+--- a/clamd/clamd.c
++++ b/clamd/clamd.c
+@@ -132,7 +132,7 @@ int main(int argc, char **argv)
+     if(check_flevel())
+         exit(1);
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     memset(&sa, 0, sizeof(sa));
+     sa.sa_handler = SIG_IGN;
+     sigaction(SIGHUP, &sa, NULL);
+@@ -177,7 +177,7 @@ int main(int argc, char **argv)
+     }
+ 
+     /* drop privileges */
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(geteuid() == 0 && (opt = optget(opts, "User"))->enabled) {
+         if((user = getpwnam(opt->strarg)) == NULL) {
+             fprintf(stderr, "ERROR: Can't get information about user %s.\n", opt->strarg);
+@@ -603,7 +603,7 @@ int main(int argc, char **argv)
+                 }
+             }
+         }
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         if(localsock) {
+             int *t;
+             mode_t sock_mode, umsk = umask(0777); /* socket is created with 000 to avoid races */
+@@ -722,7 +722,7 @@ int main(int argc, char **argv)
+         closesocket(lsockets[i]);
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(nlsockets && localsock) {
+         opt = optget(opts, "LocalSocket");
+ 
+diff --git a/clamd/others.c b/clamd/others.c
+--- a/clamd/others.c
++++ b/clamd/others.c
+@@ -83,7 +83,7 @@ static void xfree(void *p)
+         free(p);
+ }
+ 
+-#ifdef	_WIN32
++#if defined(_WIN32) || defined(__native_client__)
+ void
+ virusaction (const char *filename, const char *virname,
+              const struct optstruct *opts)
+diff --git a/clamd/server-th.c b/clamd/server-th.c
+--- a/clamd/server-th.c
++++ b/clamd/server-th.c
+@@ -701,7 +701,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	int max_threads, max_queue, readtimeout, ret = 0;
+ 	unsigned int options = 0;
+ 	char timestr[32];
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	struct sigaction sigact;
+ 	sigset_t sigset;
+ 	struct rlimit rlim;
+@@ -728,7 +728,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	struct thrarg *tharg = NULL; /* shut up gcc */
+ #endif
+ 
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	memset(&sigact, 0, sizeof(struct sigaction));
+ #endif
+ 
+@@ -759,7 +759,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     else
+     	logg("^Limits: File size limit protection disabled.\n");
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if(getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
+ 	if(rlim.rlim_cur < (rlim_t) cl_engine_get_num(engine, CL_ENGINE_MAX_FILESIZE, NULL))
+ 	    logg("^System limit for file size is lower than engine->maxfilesize\n");
+@@ -796,7 +796,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     else
+     	logg("^Limits: Files limit protection disabled.\n");
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     if (getrlimit(RLIMIT_CORE, &rlim) == 0) {
+ 	logg("*Limits: Core-dump limit is %lu.\n", (unsigned long)rlim.rlim_cur);
+     }
+@@ -1048,7 +1048,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+     acceptdata.commandtimeout = optget(opts, "CommandReadTimeout")->numarg;
+     readtimeout = optget(opts, "ReadTimeout")->numarg;
+ 
+-#if !defined(_WIN32) && defined(RLIMIT_NOFILE)
++#if !defined(_WIN32) && defined(RLIMIT_NOFILE) && !defined(__native_client__)
+     if (getrlimit(RLIMIT_NOFILE, &rlim) == 0) {
+ 	/* don't warn if default value is too high, silently fix it */
+ 	unsigned maxrec;
+@@ -1121,7 +1121,7 @@ int recvloop_th(int *socketds, unsigned nsockets, struct cl_engine *engine, unsi
+ 	logg("!On-access scan is not available\n");
+ #endif
+ 
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     /* set up signal handling */
+     sigfillset(&sigset);
+     sigdelset(&sigset, SIGINT);
+diff --git a/clamdscan/clamdscan.c b/clamdscan/clamdscan.c
+--- a/clamdscan/clamdscan.c
++++ b/clamdscan/clamdscan.c
+@@ -64,7 +64,7 @@ int main(int argc, char **argv)
+ 	time_t starttime;
+         struct optstruct *opts;
+         const struct optstruct *opt;
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+ 	struct sigaction sigact;
+ #endif
+ 
+@@ -134,7 +134,7 @@ int main(int argc, char **argv)
+ 	exit(2);
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     memset(&sigact, 0, sizeof(struct sigaction));
+     sigact.sa_handler = SIG_IGN;
+     sigemptyset(&sigact.sa_mask);
+diff --git a/clamdscan/proto.c b/clamdscan/proto.c
+--- a/clamdscan/proto.c
++++ b/clamdscan/proto.c
+@@ -46,6 +46,9 @@
+ #include <arpa/inet.h>
+ #include <sys/socket.h>
+ #include <netdb.h>
++#ifdef __native_client__
++#include <sys/un.h>
++#endif
+ #endif
+ 
+ #include "libclamav/clamav.h"
+diff --git a/clamscan/clamscan.c b/clamscan/clamscan.c
+--- a/clamscan/clamscan.c
++++ b/clamscan/clamscan.c
+@@ -50,6 +50,15 @@
+ #include "libclamav/str.h"
+ #include "libclamav/clamav.h"
+ 
++const char *prog_name = "clamav";
++
++work_ctx pipeline_ctx;
++int for_nacl_pipeline = 0;
++char *desc_pipeline;
++int64_t dlen_pipeline;
++char *data_pipeline;
++int64_t len_pipeline;
++
+ void help(void);
+ 
+ struct s_info info;
+@@ -78,12 +87,29 @@ int main(int argc, char **argv)
+ 
+     cl_initialize_crypto();
+ 
+-
+     if((opts = optparse(NULL, argc, argv, 1, OPT_CLAMSCAN, 0, NULL)) == NULL) {
+ 	mprintf("!Can't parse command line options\n");
+ 	return 2;
+     }
+ 
++    if(optget(opts, "for-nacl-pipeline")->enabled) {
++      for_nacl_pipeline = 1;
++      WorkSpec *spec = WorkSpec_parse(argv[argc - 1]);
++      if (!spec || spec->n <= 0) {
++        mprintf("!no spec\n");
++        return 2;
++      }
++      if (setup_for_work(spec)) {
++        mprintf("!failed to setup for work\n");
++        return 2;
++      }
++      pipeline_ctx = alloc_ctx();
++      if (!pipeline_ctx) {
++        mprintf("!no pipeline_ctx\n");
++        return 2;
++      }
++    }
++
+     if(optget(opts, "verbose")->enabled) {
+ 	mprintf_verbose = 1;
+ 	logg_verbose = 1;
+@@ -97,7 +123,7 @@ int main(int argc, char **argv)
+ 
+ 
+     if(optget(opts, "debug")->enabled) {
+-#if defined(C_LINUX)
++#if defined(C_LINUX) && !defined(__OSA__)
+ 	    /* njh@bandsman.co.uk: create a dump if needed */
+ 	    struct rlimit rlim;
+ 
+@@ -144,7 +170,7 @@ int main(int argc, char **argv)
+ 	    optfree(opts);
+ 	    return 2;
+ 	}
+-    } else 
++    } else
+ 	logg_file = NULL;
+ 
+     if(actsetup(opts)) {
+@@ -206,6 +232,8 @@ void help(void)
+ 
+     mprintf("    --help                -h             Print this help screen\n");
+     mprintf("    --version             -V             Print version number\n");
++    mprintf("    --for-nacl-pipeline                  For pipeline\n");
++    mprintf("    --disable-cache                      Disable cache\n");
+     mprintf("    --verbose             -v             Be verbose\n");
+     mprintf("    --archive-verbose     -a             Show filenames inside scanned archives\n");
+     mprintf("    --debug                              Enable libclamav's debug messages\n");
+@@ -264,6 +292,7 @@ void help(void)
+     mprintf("    --scan-archive[=yes(*)/no]           Scan archive files (supported by libclamav)\n");
+     mprintf("    --detect-broken[=yes/no(*)]          Try to detect broken executable files\n");
+     mprintf("    --block-encrypted[=yes/no(*)]        Block encrypted archives\n");
++    mprintf("    --output-app-label[=yes/no(*)]       Output app label to next stage\n");
+     mprintf("    --nocerts                            Disable authenticode certificate chain verification in PE files\n");
+     mprintf("    --dumpcerts                          Dump authenticode certificate chain in PE files\n");
+     mprintf("\n");
+diff --git a/clamscan/email_pipe_defs.h b/clamscan/email_pipe_defs.h
+new file mode 100644
+--- /dev/null
++++ b/clamscan/email_pipe_defs.h
+@@ -0,0 +1,39 @@
++#ifndef _UTIL_H_
++#define _UTIL_H_
++
++#define REQ_TYPE_EMPTY 0  // skip
++#define REQ_TYPE_TEXT_AND_ATTACHMENT 1
++#define REQ_TYPE_TEXT_ONLY 2
++#define REQ_TYPE_ATTACHMENT_ONLY 3
++#define REQ_TYPE_END 4 // stop
++
++#define APP_ID_DSPAM   'd'
++#define APP_ID_CLAMAV  'c'
++
++typedef struct email_request_info {
++  int32_t req_type;
++  int32_t email_text_len;
++  int32_t attachment_len;
++  unsigned char data[0];
++} email_request_info;
++
++// dspam info
++struct d_info {
++  char result_str[16];
++};
++
++// clamav info
++struct c_info {
++    uint16_t sigs;		/* number of signatures */
++    uint16_t files;		/* number of scanned files */
++    uint16_t ifiles;	/* number of infected files */
++    uint16_t errors;	/* number of errors */
++    uint32_t blocks;	/* number of *scanned* 16kb blocks */
++    uint32_t rblocks;	/* number of *read* 16kb blocks */
++};
++
++struct pipeline_result {
++  struct d_info dinfo;
++  struct c_info cinfo;
++};
++#endif
+diff --git a/clamscan/global.h b/clamscan/global.h
+--- a/clamscan/global.h
++++ b/clamscan/global.h
+@@ -21,6 +21,9 @@
+ #ifndef __GLOBAL_H
+ #define __GLOBAL_H
+ 
++#include <pipeline/pipeline.h>
++#include <pipeline/worker.h>
++
+ struct s_info {
+     unsigned int sigs;		/* number of signatures */
+     unsigned int dirs;		/* number of scanned directories */
+@@ -35,4 +38,11 @@ extern struct s_info info;
+ extern short recursion, bell;
+ extern short printinfected, printclean;
+ 
++extern int for_nacl_pipeline;
++extern char *desc_pipeline;
++extern int64_t dlen_pipeline;
++extern char *data_pipeline;
++extern int64_t len_pipeline;
++extern work_ctx pipeline_ctx;
++
+ #endif
+diff --git a/clamscan/manager.c b/clamscan/manager.c
+--- a/clamscan/manager.c
++++ b/clamscan/manager.c
+@@ -62,6 +62,7 @@
+ #include "libclamav/str.h"
+ #include "libclamav/readdb.h"
+ #include "libclamav/cltypes.h"
++#include "email_pipe_defs.h"
+ 
+ #ifdef C_LINUX
+ dev_t procdev;
+@@ -72,7 +73,7 @@ char hostid[37];
+ int is_valid_hostid(void);
+ char *get_hostid(void *cbdata);
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+ /* FIXME: If possible, handle users correctly */
+ static int checkaccess(const char *path, const char *username, int mode)
+ {
+@@ -307,7 +308,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+ 
+             return;
+         }
+-#endif    
++#endif
+         if(!sb.st_size) {
+             if(!printinfected)
+                 logg("~%s: Empty file\n", filename);
+@@ -318,7 +319,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+         info.rblocks += sb.st_size / CL_COUNT_PRECISION;
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__) && !defined(__OSA__)
+     if(geteuid()) {
+         if(checkaccess(filename, NULL, R_OK) != 1) {
+             if(!printinfected)
+@@ -350,8 +351,7 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+ 
+     if((ret = cl_scandesc_callback(fd, virpp, &info.blocks, engine, options, &chain)) == CL_VIRUS) {
+         if (options & CL_SCAN_ALLMATCHES) {
+-            virpp = (const char **)*virpp; /* allmatch needs an extra dereference */
+-            virname = virpp[0]; /* this is the first virus */
++            virpp = (const char **)*virpp; /* allmatch needs an extra dereference */ virname = virpp[0]; /* this is the first virus */
+         }
+         if(optget(opts, "archive-verbose")->enabled) {
+             if (chain.nchains > 1) {
+@@ -380,9 +380,6 @@ static void scanfile(const char *filename, struct cl_engine *engine, const struc
+         if(bell)
+             fprintf(stderr, "\007");
+     } else if(ret == CL_CLEAN) {
+-        if(!printinfected && printclean)
+-            mprintf("~%s: OK\n", filename);
+-
+         info.files++;
+     } else {
+         if(!printinfected)
+@@ -520,10 +517,13 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+     unsigned int fsize = 0;
+     const char *virname, *tmpdir;
+     const char **virpp = &virname;
+-    char *file, buff[FILEBUFF];
++    char *file, *buff;
+     size_t bread;
+     FILE *fs;
++    unsigned int len;
++    bool output_app_label = false;
+ 
++#if 0
+     if(optget(opts, "tempdir")->enabled) {
+         tmpdir = optget(opts, "tempdir")->strarg;
+     } else {
+@@ -535,26 +535,73 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+         logg("!Can't write to temporary directory\n");
+         return 2;
+     }
++#else
++    tmpdir = cli_gettmpdir();
++#endif
++    if(optget(opts, "output-app-label")->enabled) {
++         output_app_label = true;
++    }
+ 
++   fprintf(stdout, "clamav: Ready to process\n");
++   while (1) {
+     if(!(file = cli_gentemp(tmpdir))) {
+         logg("!Can't generate tempfile name\n");
+         return 2;
+     }
+-
+-    if(!(fs = fopen(file, "wb"))) {
++    if (for_nacl_pipeline) {
++      int written;
++#ifdef __native_client__
++      if (wait_for_chan(output_app_label, NULL, NULL, NULL, NULL, NULL)) {
++          logg("!wait for chan failed\n");
++          return 2;
++      }
++#endif
++      if(!(fs = fopen(file, "wb"))) {
+         logg("!Can't open %s for writing\n", file);
+-        free(file);
+         return 2;
+-    }
+-
+-    while((bread = fread(buff, 1, FILEBUFF, stdin))) {
++      }
++#ifdef __native_client__
++      int not_ready = get_work_desc(pipeline_ctx, &desc_pipeline, &dlen_pipeline, &data_pipeline, &len_pipeline);
++      if (not_ready || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++          logg("!not ready\n");
++          return 2;
++      }
++#else
++      int ret1 = get_work_desc_single(pipeline_ctx, &desc_pipeline, &dlen_pipeline, &data_pipeline, &len_pipeline);
++      if (ret1 || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++          logg("!not ready\n");
++          return 2;
++      }
++#endif
++      email_request_info *einfo = (email_request_info *)data_pipeline;
++      fsize = 0;
++      while(fsize < einfo->attachment_len) {
++        written = fwrite(einfo->data + einfo->email_text_len + fsize, 1, einfo->attachment_len - fsize, fs);
++        if (written < 0) {
++          logg("!Can't write to %s\n", file);
++          fclose(fs);
++          return 2;
++        }
++        fsize += written;
++      }
++    } else {
++      if(!(fs = fopen(file, "wb"))) {
++        logg("!Can't open %s for writing\n", file);
++        return 2;
++      }
++      buff = malloc(FILEBUFF);
++      if (buff == NULL) {
++        logg("!Can't allocate file buffer\n");
++      }
++      while((bread = fread(buff, 1, FILEBUFF, stdin))) {
+         fsize += bread;
+         if(fwrite(buff, 1, bread, fs) < bread) {
+-            logg("!Can't write to %s\n", file);
+-            free(file);
+-            fclose(fs);
+-            return 2;
++          logg("!Can't write to %s\n", file);
++          fclose(fs);
++          return 2;
+         }
++      }
++      free(buff);
+     }
+ 
+     fclose(fs);
+@@ -584,8 +631,6 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+         if(bell)
+             fprintf(stderr, "\007");
+     } else if(ret == CL_CLEAN) {
+-        if(!printinfected)
+-            mprintf("stdin: OK\n");
+     } else {
+         if(!printinfected)
+             logg("stdin: %s ERROR\n", cl_strerror(ret));
+@@ -595,6 +640,28 @@ static int scanstdin(const struct cl_engine *engine, const struct optstruct *opt
+ 
+     unlink(file);
+     free(file);
++    if (for_nacl_pipeline) {
++      unsigned char tmp[sizeof(struct c_info) + 1];
++      struct c_info *cinfo = (struct c_info *)(tmp + 1);
++      tmp[0] = APP_ID_CLAMAV;
++      cinfo->sigs = info.sigs;
++      cinfo->files = info.files;
++      info.files = 0;
++      cinfo->ifiles = info.ifiles;
++      info.ifiles = 0;
++      cinfo->errors = info.errors;
++      info.errors = 0;
++      cinfo->blocks = info.blocks;
++      info.blocks = 0;
++      cinfo->rblocks = info.rblocks;
++      info.rblocks = 0;
++      put_work_desc(pipeline_ctx, desc_pipeline, dlen_pipeline, tmp, 1 + sizeof(struct s_info));
++      free(data_pipeline);
++      free(desc_pipeline);
++    } else {
++      break;
++    }
++    }
+     return ret;
+ }
+ 
+@@ -607,7 +674,7 @@ int scanmanager(const struct optstruct *opts)
+     char *file, cwd[1024], *pua_cats = NULL;
+     const char *filename;
+     const struct optstruct *opt;
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__OSA__)
+     struct rlimit rlim;
+ #endif
+ 
+@@ -858,7 +925,7 @@ int scanmanager(const struct optstruct *opts)
+         }
+     }
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__) && !defined(__OSA__)
+     if(getrlimit(RLIMIT_FSIZE, &rlim) == 0) {
+         if(rlim.rlim_cur < (rlim_t) cl_engine_get_num(engine, CL_ENGINE_MAX_FILESIZE, NULL))
+             logg("^System limit for file size is lower than engine->maxfilesize\n");
+diff --git a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -6053,7 +6053,8 @@ irix5* | irix6* | nonstopux*)
+   ;;
+ 
+ # This must be glibc/ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++# Patched by naclports using patch_configure.py
++linux* | k*bsd*-gnu | kopensolaris*-gnu | nacl*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -11251,6 +11252,18 @@ uts4*)
+   shlibpath_var=LD_LIBRARY_PATH
+   ;;
+ 
++nacl)
++  # Patched by naclports using patch_configure.py
++  if libc_so=`$CC -print-file-name=libc.so` && [ "$libc_so" != libc.so ]; then
++    dynamic_linker="GNU/NaCl ld.so"
++    version_type=linux
++    library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++    soname_spec='${libname}${release}${shared_ext}$major'
++  else
++    dynamic_linker=no
++  fi
++  ;;
++
+ *)
+   dynamic_linker=no
+   ;;
+diff --git a/freshclam/freshclam.c b/freshclam/freshclam.c
+--- a/freshclam/freshclam.c
++++ b/freshclam/freshclam.c
+@@ -225,7 +225,7 @@ download (const struct optstruct *opts, const char *cfgfile)
+         while (opt)
+         {
+             ret = downloadmanager (opts, opt->strarg, try);
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+             alarm (0);
+ #endif
+             if (ret == FCE_CONNECTION || ret == FCE_BADCVD
+@@ -288,7 +288,7 @@ main (int argc, char **argv)
+     char *pt;
+     struct optstruct *opts;
+     const struct optstruct *opt;
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+     struct sigaction sigact;
+     struct sigaction oldact;
+ #endif
+@@ -596,7 +596,7 @@ main (int argc, char **argv)
+ 
+     *updtmpdir = 0;
+ 
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+     signal (SIGINT, sighandler);
+ #else
+     memset (&sigact, 0, sizeof (struct sigaction));
+@@ -607,7 +607,7 @@ main (int argc, char **argv)
+     if (optget (opts, "daemon")->enabled)
+     {
+         int bigsleep, checks;
+-#ifndef	_WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         time_t now, wakeup;
+ 
+         sigaction (SIGTERM, &sigact, NULL);
+@@ -637,7 +637,7 @@ main (int argc, char **argv)
+ 
+         bigsleep = 24 * 3600 / checks;
+ 
+-#ifndef _WIN32
++#if !defined(_WIN32) && !defined(__native_client__)
+         if (!optget (opts, "Foreground")->enabled)
+         {
+             if (daemonize () == -1)
+@@ -679,14 +679,14 @@ main (int argc, char **argv)
+             }
+ 
+             logg ("#--------------------------------------\n");
+-#ifdef	SIGALRM
++#if defined(SIGALRM) && !defined(__native_client__)
+             sigaction (SIGALRM, &sigact, &oldact);
+ #endif
+-#ifdef	SIGUSR1
++#if defined(SIGUSR1) && !defined(__native_client__)
+             sigaction (SIGUSR1, &sigact, &oldact);
+ #endif
+ 
+-#ifdef	_WIN32
++#if defined(_WIN32) || defined(__native_client__)
+             sleep (bigsleep);
+ #else
+             time (&wakeup);
+@@ -712,10 +712,10 @@ main (int argc, char **argv)
+             }
+ #endif
+ 
+-#ifdef	SIGALRM
++#if defined(SIGALRM) && !defined(__native_client__)
+             sigaction (SIGALRM, &oldact, NULL);
+ #endif
+-#ifdef	SIGUSR1
++#if defined(SIGUSR1) && !defined(__native_client__)
+             sigaction (SIGUSR1, &oldact, NULL);
+ #endif
+         }
+diff --git a/freshclam/manager.c b/freshclam/manager.c
+--- a/freshclam/manager.c
++++ b/freshclam/manager.c
+@@ -269,7 +269,9 @@ wwwconnect (const char *server, const char *proxy, int pport, char *ip,
+     if (proxy)
+     {
+         hostpt = proxy;
+-
++#if defined(__native_client__) && defined(_NEWLIB_VERSION)
++        port = 8080;
++#else
+         if (!(port = pport))
+         {
+             const struct servent *webcache =
+@@ -282,7 +284,7 @@ wwwconnect (const char *server, const char *proxy, int pport, char *ip,
+ 
+             endservent ();
+         }
+-
++#endif
+     }
+     else
+     {
+@@ -1587,7 +1589,13 @@ test_database (const char *newfile, const char *newdb, int bytecode)
+     return 0;
+ }
+ 
+-#ifndef WIN32
++#ifdef __native_client__
++static int
++test_database_wrap (const char *file, const char *newdb, int bytecode)
++{
++    return test_database(file, newdb, bytecode);
++}
++#elif !defined(WIN32)
+ static int
+ test_database_wrap (const char *file, const char *newdb, int bytecode)
+ {
+diff --git a/libclamav/bytecode_detect.c b/libclamav/bytecode_detect.c
+--- a/libclamav/bytecode_detect.c
++++ b/libclamav/bytecode_detect.c
+@@ -239,8 +239,12 @@ void cli_detect_environment(struct cli_environment *env)
+ #elif defined(_WIN32)
+     env->os_category = os_win32;
+ #else
++#ifdef __native_client__
++    env->os_category = os_unknown;
++#else
+     env->os_category = os_generic;
+ #endif
++#endif
+ 
+     env->os = llvm_os_UnknownOS;
+     /* -- Detect compiler -- */
+diff --git a/libclamav/bytecode_vm.c b/libclamav/bytecode_vm.c
+--- a/libclamav/bytecode_vm.c
++++ b/libclamav/bytecode_vm.c
+@@ -1204,7 +1204,11 @@ int cli_vm_execute(const struct cli_bc *bc, struct cli_bc_ctx *ctx, const struct
+                 break;
+             }
+             DEFINE_OP(OP_BC_GEP1) {
++#ifdef __native_client__
++                long long ptr, iptr;
++#else
+                 int64_t ptr, iptr;
++#endif
+                 int32_t off;
+                 READ32(off, inst->u.three[2]);
+ 
+@@ -1226,7 +1230,7 @@ int cli_vm_execute(const struct cli_bc *bc, struct cli_bc_ctx *ctx, const struct
+                     READ64(ptr, inst->u.three[1]);
+                     off *= inst->u.three[0];
+                     off += (ptr & 0x00000000ffffffff);
+-                    iptr = (ptr & 0xffffffff00000000) + (uint64_t)(off);
++                    iptr = (ptr & 0xffffffff00000000ULL) + (uint64_t)(off);
+                     WRITE64(inst->dest, iptr);
+                 }
+                 break;
+diff --git a/libclamav/c++/bytecode2llvm.cpp b/libclamav/c++/bytecode2llvm.cpp
+--- a/libclamav/c++/bytecode2llvm.cpp
++++ b/libclamav/c++/bytecode2llvm.cpp
+@@ -373,7 +373,7 @@ static int64_t rtlib_srl_i64(int64_t a, int32_t b)
+     return (uint64_t)a >> b;
+ }
+ /* Implementation independent sign-extended signed right shift */
+-#ifdef HAVE_SAR
++#if defined(HAVE_SAR) || defined(__native_client__)
+ #define CLI_SRS(n,s) ((n)>>(s))
+ #else
+ #define CLI_SRS(n,s) ((((n)>>(s)) ^ (1<<(sizeof(n)*8-1-s))) - (1<<(sizeof(n)*8-1-s)))
+diff --git a/libclamav/cvd.c b/libclamav/cvd.c
+--- a/libclamav/cvd.c
++++ b/libclamav/cvd.c
+@@ -548,6 +548,7 @@ static int cli_cvdverify(FILE *fs, struct cl_cvd *cvdpt, unsigned int skipsig)
+     }
+     cli_dbgmsg("MD5(.tar.gz) = %s\n", md5);
+ 
++#if 0
+     if(strncmp(md5, cvd->md5, 32)) {
+ 	cli_dbgmsg("cli_cvdverify: MD5 verification error\n");
+ 	free(md5);
+@@ -561,6 +562,7 @@ static int cli_cvdverify(FILE *fs, struct cl_cvd *cvdpt, unsigned int skipsig)
+ 	cl_cvdfree(cvd);
+ 	return CL_EVERIFY;
+     }
++#endif
+ 
+     free(md5);
+     cl_cvdfree(cvd);
+diff --git a/libclamav/fmap.c b/libclamav/fmap.c
+--- a/libclamav/fmap.c
++++ b/libclamav/fmap.c
+@@ -52,12 +52,34 @@ static inline unsigned int fmap_which_page(fmap_t *m, size_t at);
+ #ifndef _WIN32
+ /* pread proto here in order to avoid the use of XOPEN and BSD_SOURCE
+    which may in turn prevent some mmap constants to be defined */
++#ifndef __native_client__
+ ssize_t pread(int fd, void *buf, size_t count, off_t offset);
++#endif
+ 
+ /* vvvvv POSIX STUFF BELOW vvvvv */
+ static off_t pread_cb(void *handle, void *buf, size_t count, off_t offset)
+ {
++// Reimplement pread here
++#ifdef __native_client__
++    int fd = (int)(ssize_t)handle;
++    off_t cur_pos;
++    ssize_t num_read;
++
++    if ((cur_pos = lseek(fd, 0, SEEK_CUR)) == (off_t)-1)
++        return -1;
++
++    if (lseek(fd, offset, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    num_read = read(fd, buf, count);
++
++    if (lseek(fd, cur_pos, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    return num_read;  
++#else
+     return pread((int)(ssize_t)handle, buf, count, offset);
++#endif
+ }
+ 
+ 
+@@ -81,7 +103,8 @@ fmap_t *fmap_check_empty(int fd, off_t offset, size_t len, int *empty) {
+ 	cli_warnmsg("fmap: attempted oof mapping\n");
+ 	return NULL;
+     }
+-    m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 1);
++    //m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 1);
++    m = cl_fmap_open_handle((void*)(ssize_t)fd, offset, len, pread_cb, 0);
+     if (!m)
+ 	return NULL;
+     m->mtime = st.st_mtime;
+diff --git a/libclamav/others.c b/libclamav/others.c
+--- a/libclamav/others.c
++++ b/libclamav/others.c
+@@ -1139,6 +1139,10 @@ int cli_rmdirs(const char *dirname)
+ 	char err[128];
+ 
+ 
++  if (memcmp(dirname, ":mem:", 5) == 0) {
++    return rmdir(dirname);
++  }
++
+     chmod(dirname, 0700);
+     if((dd = opendir(dirname)) != NULL) {
+ 	while(CLAMSTAT(dirname, &maind) != -1) {
+diff --git a/libclamav/others.h b/libclamav/others.h
+--- a/libclamav/others.h
++++ b/libclamav/others.h
+@@ -542,7 +542,7 @@ const char *cli_get_last_virus_str(const cli_ctx *ctx);
+ #define CLI_ROR(a,b) a = ( a >> ((b) & __SHIFTMASK(a)) ) | ( a << ((__SHIFTBITS(a) - (b)) & __SHIFTMASK(a)) )
+ 
+ /* Implementation independent sign-extended signed right shift */
+-#ifdef HAVE_SAR
++#if defined(HAVE_SAR) || defined(__native_client__)
+ #define CLI_SRS(n,s) ((n)>>(s))
+ #else
+ #define CLI_SRS(n,s) ((((n)>>(s)) ^ (1<<(sizeof(n)*8-1-s))) - (1<<(sizeof(n)*8-1-s)))
+@@ -614,11 +614,11 @@ static inline int cli_getpagesize(void) {
+ }
+ #else /* ! _WIN32 */
+ #if HAVE_SYSCONF_SC_PAGESIZE
+-static inline int cli_getpagesize(void) { return sysconf(_SC_PAGESIZE); }
++static inline int cli_getpagesize(void) { return 4096; /*return sysconf(_SC_PAGESIZE);*/ }
+ #define HAVE_CLI_GETPAGESIZE 1
+ #else
+ #if HAVE_GETPAGESIZE
+-static inline int cli_getpagesize(void) { return getpagesize(); }
++static inline int cli_getpagesize(void) { return 4096; /*getpagesize();*/ }
+ #define HAVE_CLI_GETPAGESIZE 1
+ #endif /* HAVE_GETPAGESIZE */
+ #endif /* HAVE_SYSCONF_SC_PAGESIZE */
+diff --git a/libclamav/others_common.c b/libclamav/others_common.c
+--- a/libclamav/others_common.c
++++ b/libclamav/others_common.c
+@@ -299,7 +299,7 @@ const char* cli_ctime(const time_t *timep, char *buf, const size_t bufsize)
+ 		return buf;
+ 	}
+ 
+-#ifdef HAVE_CTIME_R	
++#ifdef HAVE_CTIME_R
+ # ifdef HAVE_CTIME_R_2
+ 	ret = ctime_r(timep, buf);
+ # else
+@@ -437,6 +437,8 @@ int cli_filecopy(const char *src, const char *dest)
+ #endif /* P_tmpdir */
+ 
+ const char *cli_gettmpdir(void) {
++  return ":mem:clamav-tmp";
++#if 0
+ 	const char *tmpdir;
+     unsigned int i;
+ 
+@@ -451,6 +453,7 @@ const char *cli_gettmpdir(void) {
+             return tmpdir;
+ 
+     return P_tmpdir;
++#endif
+ }
+ 
+ struct dirent_data {
+@@ -854,6 +857,8 @@ unsigned int cli_rndnum(unsigned int max)
+     return 1 + (unsigned int) (max * (rand() / (1.0 + RAND_MAX)));
+ }
+ 
++uint64_t tmpctr = 0;
++
+ char *cli_gentemp(const char *dir)
+ {
+ 	char *name, *tmp;
+@@ -870,6 +875,13 @@ char *cli_gentemp(const char *dir)
+ 	cli_dbgmsg("cli_gentemp('%s'): out of memory\n", mdir);
+ 	return NULL;
+     }
++    // yxu: replace rand with counter
++#ifdef __native_client__
++	snprintf(name, len, "%s"PATHSEP"clamav-%llu.tmp", mdir, tmpctr++);
++#else
++	snprintf(name, len, "%s"PATHSEP"clamav-%lu.tmp", mdir, tmpctr++);
++#endif
++  return name;
+ 
+ #ifdef CL_THREAD_SAFE
+     pthread_mutex_lock(&cli_gentemp_mutex);
+diff --git a/libclamav/scanners.c b/libclamav/scanners.c
+--- a/libclamav/scanners.c
++++ b/libclamav/scanners.c
+@@ -188,7 +188,7 @@ static int cli_scandir(const char *dirname, cli_ctx *ctx)
+ 		    free(fname);
+ 		}
+ 	    }
+-	} 
++	}
+     } else {
+ 	cli_dbgmsg("cli_scandir: Can't open directory %s.\n", dirname);
+ 	return CL_EOPEN;
+@@ -2036,7 +2036,7 @@ static int cli_scanembpe(cli_ctx *ctx, off_t offset)
+ }
+ 
+ 
+-#if defined(_WIN32) || defined(C_LINUX)
++#if (defined(_WIN32) || defined(C_LINUX)) && !defined(__OSA__)
+ #define PERF_MEASURE
+ #endif
+ 
+diff --git a/libclamav/stats.c b/libclamav/stats.c
+--- a/libclamav/stats.c
++++ b/libclamav/stats.c
+@@ -31,20 +31,24 @@
+ 
+ #include <sys/types.h>
+ #if !defined(_WIN32)
+-#if defined(C_SOLARIS)
+-#include <sys/utsname.h>
+-#else
+-#if HAVE_SYS_PARAM_H
+-#include <sys/param.h>
+-#endif
+-#if HAVE_SYSCTLBYNAME
+-#include <sys/sysctl.h>
++ #if defined(C_SOLARIS)
++  #include <sys/utsname.h>
++ #else
++  #if HAVE_SYS_PARAM_H
++   #include <sys/param.h>
++  #endif
++  #if HAVE_SYSCTLBYNAME
++   #include <sys/sysctl.h>
++  #endif
++ #endif
++
++#if !defined (__native_client__) || !defined(_NEWLIB_VERSION)
++ #include <dlfcn.h>
+ #endif
+-#endif
+-#include <dlfcn.h>
++
+ #else
+-#include <Windows.h>
+-#include <tchar.h>
++ #include <Windows.h>
++ #include <tchar.h>
+ #endif
+ 
+ #ifdef CL_THREAD_SAFE
+diff --git a/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c b/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
+--- a/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
++++ b/libclamav/tomsfastmath/mont/fp_montgomery_reduce.c
+@@ -42,7 +42,7 @@ asm(                                        \
+ : "%eax", "cc")
+ 
+ /******************************************************************/
+-#elif defined(TFM_X86_64)
++#elif (defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__))
+ /* x86-64 code */
+ 
+ #define MONT_START 
+@@ -509,7 +509,7 @@ void fp_montgomery_reduce(fp_int *a, fp_int *m, fp_digit mp)
+        _c   = c + x;
+        tmpm = m->dp;
+        y = 0;
+-       #if (defined(TFM_SSE2) || defined(TFM_X86_64))
++       #if (defined(TFM_SSE2) || defined(TFM_X86_64)) && !defined(__native_client__) && !defined(__OSA__)
+         for (; y < (pa & ~7); y += 8) {
+               INNERMUL8;
+               _c   += 8;
+diff --git a/libclamav/tomsfastmath/mul/fp_mul_comba.c b/libclamav/tomsfastmath/mul/fp_mul_comba.c
+--- a/libclamav/tomsfastmath/mul/fp_mul_comba.c
++++ b/libclamav/tomsfastmath/mul/fp_mul_comba.c
+@@ -55,7 +55,7 @@ asm(                                                      \
+      "adcl  $0,%2        \n\t"                            \
+      :"=r"(c0), "=r"(c1), "=r"(c2): "0"(c0), "1"(c1), "2"(c2), "m"(i), "m"(j)  :"%eax","%edx","cc");
+ 
+-#elif defined(TFM_X86_64)
++#elif defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__)
+ /* x86-64 optimized */
+ 
+ /* anything you need at the start */
+diff --git a/libclamav/tomsfastmath/sqr/fp_sqr_comba.c b/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
+--- a/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
++++ b/libclamav/tomsfastmath/sqr/fp_sqr_comba.c
+@@ -83,7 +83,7 @@ asm(                                                     \
+      "adcl %8,%2         \n\t"                            \
+      :"=r"(c0), "=r"(c1), "=r"(c2) : "0"(c0), "1"(c1), "2"(c2), "r"(sc0), "r"(sc1), "r"(sc2) : "cc");
+ 
+-#elif defined(TFM_X86_64)
++#elif defined(TFM_X86_64) && !defined(__native_client__) && !defined(__OSA__)
+ /* x86-64 optimized */
+ 
+ #define COMBA_START
+diff --git a/libclamav/version.h b/libclamav/version.h
+--- a/libclamav/version.h
++++ b/libclamav/version.h
+@@ -1 +1 @@
+-#define REPO_VERSION "devel-clamav-0.98.7"
++#define REPO_VERSION "devel-8070f27"
+diff --git a/shared/misc.c b/shared/misc.c
+--- a/shared/misc.c
++++ b/shared/misc.c
+@@ -249,7 +249,7 @@ int filecopy(const char *src, const char *dest)
+ 
+ int daemonize(void)
+ {
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+     fputs("Background mode is not supported on your operating system\n", stderr);
+     return -1;
+ #else
+diff --git a/shared/optparser.c b/shared/optparser.c
+--- a/shared/optparser.c
++++ b/shared/optparser.c
+@@ -63,6 +63,8 @@ const struct clam_option __clam_options[] = {
+     /* name,   longopt, sopt, argtype, regex, num, str, flags, owner, description, suggested */
+ 
+     /* cmdline only */
++    { NULL, "output-app-label", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMSCAN, "output app label", "" },
++    { NULL, "for-nacl-pipeline", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMSCAN, "for pipeline", "" },
+     { NULL, "help", 'h', CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_FRESHCLAM | OPT_CLAMSCAN | OPT_CLAMDSCAN | OPT_SIGTOOL | OPT_MILTER | OPT_CLAMCONF | OPT_CLAMDTOP | OPT_CLAMBC, "", "" },
+     { NULL, "config-file", 'c', CLOPT_TYPE_STRING, NULL, 0, CONFDIR_CLAMD, FLAG_REQUIRED, OPT_CLAMD | OPT_CLAMDSCAN | OPT_CLAMDTOP, "", "" },
+     { NULL, "config-file", 0, CLOPT_TYPE_STRING, NULL, 0, CONFDIR_FRESHCLAM, FLAG_REQUIRED, OPT_FRESHCLAM, "", "" },
+@@ -285,13 +287,13 @@ const struct clam_option __clam_options[] = {
+     /* Scan options */
+     { "Bytecode", "bytecode", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 1, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, "With this option enabled ClamAV will load bytecode from the database. It is highly recommended you keep this option on, otherwise you'll miss detections for many new viruses.", "yes" },
+ 
+-    { "BytecodeSecurity", NULL, 0, CLOPT_TYPE_STRING, "^(TrustSigned|Paranoid)$", -1, "TrustSigned", 0, OPT_CLAMD, 
++    { "BytecodeSecurity", NULL, 0, CLOPT_TYPE_STRING, "^(TrustSigned|Paranoid)$", -1, "TrustSigned", 0, OPT_CLAMD,
+ 	"Set bytecode security level.\nPossible values:\n\tTrustSigned - trust bytecode loaded from signed .c[lv]d files,\n\t\t insert runtime safety checks for bytecode loaded from other sources\n\tParanoid - don't trust any bytecode, insert runtime checks for all\nRecommended: TrustSigned, because bytecode in .cvd files already has these checks.","TrustSigned"},
+ 
+-    { "BytecodeTimeout", "bytecode-timeout", 0, CLOPT_TYPE_NUMBER, MATCH_NUMBER, 5000, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, 
++    { "BytecodeTimeout", "bytecode-timeout", 0, CLOPT_TYPE_NUMBER, MATCH_NUMBER, 5000, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN,
+ 	"Set bytecode timeout in miliseconds.","5000"},
+ 
+-    { "BytecodeUnsigned", "bytecode-unsigned", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN, 
++    { "BytecodeUnsigned", "bytecode-unsigned", 0, CLOPT_TYPE_BOOL, MATCH_BOOL, 0, NULL, 0, OPT_CLAMD | OPT_CLAMSCAN,
+ 	"Allow loading bytecode from outside digitally signed .c[lv]d files.","no"},
+ 
+     { "BytecodeMode", "bytecode-mode", 0, CLOPT_TYPE_STRING, "^(Auto|ForceJIT|ForceInterpreter|Test)$", -1, "Auto", FLAG_REQUIRED, OPT_CLAMD | OPT_CLAMSCAN,
+@@ -1156,39 +1158,39 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+ 	long long numarg, lnumarg;
+ 	int regflags = REG_EXTENDED | REG_NOSUB;
+     const struct clam_option *optentry = NULL;
+-    
++
+     if(oldopts)
+         opts = oldopts;
+-    
+-    
++
++
+     for(i = 0; ; i++) {
+         optentry = &clam_options[i];
+         if(!optentry->name && !optentry->longopt)
+             break;
+-        
++
+         if(((optentry->owner & toolmask) && ((optentry->owner & toolmask) != OPT_DEPRECATED)) || (ignore && (optentry->owner & ignore))) {
+             if(!oldopts && optadd(&opts, &opts_last, optentry->name, optentry->longopt, optentry->strarg, optentry->numarg, optentry->flags, i) < 0) {
+                 fprintf(stderr, "ERROR: optparse: Can't register new option (not enough memory)\n");
+                 optfree(opts);
+                 return NULL;
+             }
+-            
++
+         }
+     }
+-    
++
+     if(MAX(sc, lc) > MAXCMDOPTS) {
+ 	    fprintf(stderr, "ERROR: optparse: (short|long)opts[] is too small\n");
+ 	    optfree(opts);
+ 	    return NULL;
+ 	}
+-    
++
+     while(1) {
+         if(!name) {
+             fprintf(stderr, "ERROR: Problem parsing options (name == NULL)\n");
+             err = 1;
+             break;
+         }
+-        
++
+         opt = optget_i(opts, name);
+         if(!opt) {
+             if(verbose)
+@@ -1197,13 +1199,13 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+             break;
+         }
+         optentry = &clam_options[opt->idx];
+-        
++
+         if(ignore && (optentry->owner & ignore) && !(optentry->owner & toolmask)) {
+             if(verbose)
+                 fprintf(stderr, "WARNING: Ignoring unsupported option %s at line %u\n", opt->name, line);
+             continue;
+         }
+-        
++
+         if(optentry->owner & OPT_DEPRECATED) {
+             if(toolmask & OPT_DEPRECATED) {
+                 if(optaddarg(opts, name, "foo", 1) < 0) {
+@@ -1217,11 +1219,11 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+             }
+             continue;
+         }
+-        
++
+         if(optentry->regex) {
+             if(!(optentry->flags & FLAG_REG_CASE))
+                 regflags |= REG_ICASE;
+-            
++
+             if(cli_regcomp(&regex, optentry->regex, regflags)) {
+                 fprintf(stderr, "ERROR: optparse: Can't compile regular expression %s for option %s\n", optentry->regex, name);
+                 err = 1;
+@@ -1235,15 +1237,15 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                 break;
+             }
+         }
+-        
++
+         numarg = -1;
+         switch(optentry->argtype) {
+             case CLOPT_TYPE_STRING:
+                 if(!arg)
+                     arg = optentry->strarg;
+-                
++
+                 break;
+-                
++
+             case CLOPT_TYPE_NUMBER:
+                 if (arg)
+                     numarg = atoi(arg);
+@@ -1251,7 +1253,7 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                     numarg = 0;
+                 arg = NULL;
+                 break;
+-                
++
+             case CLOPT_TYPE_SIZE:
+                 errno = 0;
+                 if(arg)
+@@ -1279,41 +1281,41 @@ struct optstruct *optadditem(const char *name, const char *arg, int verbose, int
+                             err = 1;
+                     }
+                 }
+-                
++
+                 arg = NULL;
+                 if(err) break;
+                 if(errno == ERANGE) {
+                     fprintf(stderr, "WARNING: Numerical value for option %s too high, resetting to 4G\n", name);
+                     lnumarg = UINT_MAX;
+                 }
+-                
++
+                 numarg = lnumarg ? lnumarg : UINT_MAX;
+                 break;
+-                
++
+             case CLOPT_TYPE_BOOL:
+                 if(!strcasecmp(arg, "yes") || !strcmp(arg, "1") || !strcasecmp(arg, "true"))
+                     numarg = 1;
+                 else
+                     numarg = 0;
+-                
++
+                 arg = NULL;
+                 break;
+         }
+-        
++
+         if(err)
+             break;
+-        
++
+         if(optaddarg(opts, name, arg, numarg) < 0) {
+             fprintf(stderr, "ERROR: Can't register argument for option --%s\n", optentry->longopt);
+             err = 1;
+         }
+         break;
+     }
+-    
++
+     if(err) {
+         optfree(opts);
+         return NULL;
+     }
+-      
++
+     return opts;
+ }
+diff --git a/shared/output.c b/shared/output.c
+--- a/shared/output.c
++++ b/shared/output.c
+@@ -316,7 +316,7 @@ int logg(const char *str, ...)
+ 	time_t currtime;
+ 	size_t len;
+ 	mode_t old_umask;
+-#ifdef F_WRLCK
++#if defined(F_WRLCK) && !defined(__native_client__)
+ 	struct flock fl;
+ #endif
+ 
+@@ -349,9 +349,13 @@ int logg(const char *str, ...)
+     logg_open();
+ 
+     if(!logg_fp && logg_file) {
++#ifndef __native_client__ 
+         old_umask = umask(0037);
++#endif
+         if((logg_fp = fopen(logg_file, "at")) == NULL) {
++#ifndef __native_client__
+             umask(old_umask);
++#endif
+ #ifdef CL_THREAD_SAFE
+             pthread_mutex_unlock(&logg_mutex);
+ #endif
+@@ -359,9 +363,11 @@ int logg(const char *str, ...)
+             if(len > sizeof(buffer))
+                 free(abuffer);
+             return -1;
+-        } else umask(old_umask);
+-
+-#ifdef F_WRLCK
++        }
++#ifndef __native_client__ 
++	else umask(old_umask);
++#endif
++#if defined(F_WRLCK) && !defined(__native_client__)
+         if(logg_lock) {
+             memset(&fl, 0, sizeof(fl));
+             fl.l_type = F_WRLCK;
+diff --git a/unit_tests/Makefile.in b/unit_tests/Makefile.in
+--- a/unit_tests/Makefile.in
++++ b/unit_tests/Makefile.in
+@@ -508,9 +508,10 @@ top_srcdir = @top_srcdir@
+ SPLIT_DIR = $(top_srcdir)/unit_tests/.split
+ FILES = clam-phish-exe
+ programs = check_clamav
+-scripts = check_freshclam.sh check_sigtool.sh check_unit_vg.sh check1_clamscan.sh check2_clamd.sh check3_clamd.sh check4_clamd.sh\
+-	  check5_clamd_vg.sh check6_clamd_vg.sh check7_clamd_hg.sh check8_clamd_hg.sh check9_clamscan_vg.sh
+-
++scripts = check_freshclam.sh check_sigtool.sh check_unit_vg.sh check1_clamscan.sh \
++check5_clamd_vg.sh check6_clamd_vg.sh check7_clamd_hg.sh check8_clamd_hg.sh check9_clamscan_vg.sh
++#check2_clamd.sh check3_clamd.sh check4_clamd.sh\
++	  
+ utils = check_fpu_endian
+ TESTS_ENVIRONMENT = export abs_srcdir=$(abs_srcdir) AWK=$(AWK); \
+ 	$(am__append_1)
+@@ -1003,7 +1004,11 @@ check-html recheck-html:
+ 	$(MAKE) $(AM_MAKEFLAGS) $(TEST_SUITE_HTML) TEST_LOGS= || exit 4; \
+ 	exit $$rv
+ check_clamav.log: check_clamav$(EXEEXT)
+-	@p='check_clamav$(EXEEXT)'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++ifneq ($(wildcard .libs/check_clamav.nexe), )
++	@p='.libs/test_check_clamav'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++else
++	p='test_check_clamav'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
++endif
+ check_freshclam.sh.log: check_freshclam.sh
+ 	@p='check_freshclam.sh'; $(am__check_pre) $(LOG_COMPILE) "$$tst" $(am__check_post)
+ check_sigtool.sh.log: check_sigtool.sh
+diff --git a/unit_tests/check_clamav.c b/unit_tests/check_clamav.c
+--- a/unit_tests/check_clamav.c
++++ b/unit_tests/check_clamav.c
+@@ -491,7 +491,26 @@ static int get_test_file(int i, char *file, unsigned fsize, unsigned long *size)
+ 
+ static off_t pread_cb(void *handle, void *buf, size_t count, off_t offset)
+ {
++#ifdef __native_client__
++    int fd = *((int*)handle); 
++    off_t cur_pos;
++    ssize_t num_read;
++
++    if ((cur_pos = lseek(fd, 0, SEEK_CUR)) == (off_t)-1)
++        return -1;
++
++    if (lseek(fd, offset, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    num_read = read(fd, buf, count);
++
++    if (lseek(fd, cur_pos, SEEK_SET) == (off_t)-1)
++        return -1;
++
++    return num_read;
++#else
+     return pread(*((int*)handle), buf, count, offset);
++#endif
+ }
+ 
+ START_TEST (test_cl_scanmap_callback_handle)
+diff --git a/unit_tests/check_clamd.c b/unit_tests/check_clamd.c
+--- a/unit_tests/check_clamd.c
++++ b/unit_tests/check_clamd.c
+@@ -51,7 +51,14 @@
+ #include "libclamav/version.h"
+ #include "libclamav/cltypes.h"
+ 
+-#ifdef CHECK_HAVE_LOOPS
++#ifdef __native_client__
++int main(void)
++{
++    puts("\n*** Native client cannot create socket, clamd tests not run!\n");
++    /* tell automake the test was skipped */
++    return 77;
++}
++#elif defined(CHECK_HAVE_LOOPS)
+ 
+ static int sockd;
+ #define SOCKET "clamd-test.socket"
+diff --git a/unit_tests/check_common.sh b/unit_tests/check_common.sh
+--- a/unit_tests/check_common.sh
++++ b/unit_tests/check_common.sh
+@@ -7,14 +7,30 @@
+ 
+ WRAPPER=${WRAPPER-}
+ TOP=`pwd`/..
+-CLAMSCAN=$TOP/clamscan/clamscan
+-CLAMD=$TOP/clamd/clamd
+-CHECK_CLAMD=$TOP/unit_tests/check_clamd
+-CLAMDSCAN=$TOP/clamdscan/clamdscan
++if [ -f $TOP/clamscan/.libs/clamscan.nexe ]; then
++    CLAMSCAN=$TOP/clamscan/.libs/test_clamscan
++else
++    CLAMSCAN=$TOP/clamscan/clamscan
++fi
++if [ -f $TOP/clamscan/.libs/clamscan.nexe ]; then
++    CLAMD=$TOP/clamd/.libs/test_clamd
++else
++    CLAMD=$TOP/clamd/clamd
++fi
++CHECK_CLAMD=$TOP/unit_tests/test_check_clamd
++if [ -f $TOP/clamdscan/.libs/clamdscan.nexe ]; then
++    CLAMDSCAN=$TOP/clamdscan/.libs/test_clamdscan
++else
++    CLAMDSCAN=$TOP/clamdscan/clamdscan
++fi
+ TESTFILES=$TOP/test/clam*
+ NFILES=`ls -1 $TESTFILES | wc -l`
+ #CHECK_FPU_ENDIAN=$TOP/unit_tests/.libs/lt-check_fpu_endian
+-CHECK_FPU_ENDIAN=$TOP/unit_tests/check_fpu_endian
++if [ -f $TOP/unit_tests/.libs/check_fpu_endian.nexe ]; then
++    CHECK_FPU_ENDIAN=$TOP/unit_tests/.libs/test_check_fpu_endian
++else
++    CHECK_FPU_ENDIAN=$TOP/unit_tests/test_check_fpu_endian
++fi
+ 
+ killclamd() {
+     test -f clamd-test.pid &&
+@@ -49,8 +65,9 @@ die()
+ 
+ # Setup test directory to avoid temporary and output file clashes
+ test_start() {
+-    ulimit -t 120 || true; ulimit -d 1024000 || true;
+-    ulimit -v 1024000 || true;
++# Nacl tries to mmap 88G...
++#    ulimit -t 120 || true; ulimit -d 1024000 || true;
++#    ulimit -v 1024000 || true;
+     (cd test-$1 2>/dev/null && killclamd || true)
+     rm -rf test-$1
+     mkdir test-$1
+@@ -94,21 +111,25 @@ test_run() {
+    expected=$1
+    shift
+    set +e
+-   $TOP/libtool --mode=execute $WRAPPER $*
++   set -x
++   $*
+    val=$?
+    if test $val -ne $expected; then
+        error "Failed to run $*, expected $expected exitcode, but was $val" >&2;
+        return 0;
+    fi
+    set -e
++   set +x
+    return 1;
+ }
+ 
+ # Run a test and return its exitcode
+ test_run_check() {
+     set +e
+-    $TOP/libtool --mode=execute $WRAPPER $*
++    set -x
++    $*
+     val=$?
++    set +x
+     set -e
+     return $?;
+ }
+diff --git a/unit_tests/check_freshclam.sh b/unit_tests/check_freshclam.sh
+--- a/unit_tests/check_freshclam.sh
++++ b/unit_tests/check_freshclam.sh
+@@ -1,2 +1,6 @@
+ #!/bin/sh
+-../freshclam/freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++if [ -f ../freshclam/.libs/freshclam.nexe ]; then
++    ../freshclam/.libs/test_freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++else
++    ../freshclam/freshclam --config-file=$srcdir/test-freshclam.conf -V >/dev/null
++fi
+diff --git a/unit_tests/check_sigtool.sh b/unit_tests/check_sigtool.sh
+--- a/unit_tests/check_sigtool.sh
++++ b/unit_tests/check_sigtool.sh
+@@ -1,2 +1,6 @@
+ #!/bin/sh
+-../sigtool/sigtool -V >/dev/null
++if [ -f ../sigtool/.libs/sigtool.nexe ]; then
++    ../sigtool/.libs/test_sigtool -V >/dev/null
++else
++    ../sigtool/sigtool -V >/dev/null
++fi
+diff --git a/unit_tests/check_unit_vg.sh b/unit_tests/check_unit_vg.sh
+--- a/unit_tests/check_unit_vg.sh
++++ b/unit_tests/check_unit_vg.sh
+@@ -2,7 +2,7 @@
+ . $srcdir/check_common.sh
+ init_valgrind
+ export CK_FORK=no WRAPPER="$VALGRIND $VALGRIND_FLAGS" CK_DEFAULT_TIMEOUT=40
+-if test_run 0 $TOP/unit_tests/check_clamav; then
++if test_run 0 $TOP/unit_tests/.libs/test_check_clamav; then
+     echo "check_clamav failed to run" >&2
+ fi
+ end_valgrind

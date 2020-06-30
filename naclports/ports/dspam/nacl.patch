@@ -1,0 +1,412 @@
+diff --git a/configure b/configure
+--- a/configure
++++ b/configure
+@@ -5166,7 +5166,8 @@ irix5* | irix6* | nonstopux*)
+   ;;
+ 
+ # This must be Linux ELF.
+-linux* | k*bsd*-gnu | kopensolaris*-gnu)
++# Patched by naclports using patch_configure.py
++linux* | k*bsd*-gnu | kopensolaris*-gnu | nacl*)
+   lt_cv_deplibs_check_method=pass_all
+   ;;
+ 
+@@ -10600,6 +10601,18 @@ uts4*)
+   shlibpath_var=LD_LIBRARY_PATH
+   ;;
+ 
++nacl)
++  # Patched by naclports using patch_configure.py
++  if libc_so=`$CC -print-file-name=libc.so` && [ "$libc_so" != libc.so ]; then
++    dynamic_linker="GNU/NaCl ld.so"
++    version_type=linux
++    library_names_spec='${libname}${release}${shared_ext}$versuffix ${libname}${release}${shared_ext}${major} ${libname}${shared_ext}'
++    soname_spec='${libname}${release}${shared_ext}$major'
++  else
++    dynamic_linker=no
++  fi
++  ;;
++
+ *)
+   dynamic_linker=no
+   ;;
+@@ -14282,12 +14295,12 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
+ 
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking SQLite header version" >&5
+ $as_echo_n "checking SQLite header version... " >&6; }
+-    if test "$cross_compiling" = yes; then :
+-     # cross-compilation
+-            as_fn_error $? "cross-compilation is unsupported, sorry" "$LINENO" 5
+-            ds_sqlite_headers_success=no
++#     if test "$cross_compiling" = yes; then :
++#      # cross-compilation
++#             as_fn_error $? "cross-compilation is unsupported, sorry" "$LINENO" 5
++#             ds_sqlite_headers_success=no
+ 
+-else
++# else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+@@ -14353,7 +14366,7 @@ $as_echo "failure (unsupported version?)" >&6; }
+ fi
+ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+-fi
++# fi
+ 
+     ac_ext=c
+ ac_cpp='$CPP $CPPFLAGS'
+@@ -14679,78 +14692,86 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
+ 
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking SQLite header version" >&5
+ $as_echo_n "checking SQLite header version... " >&6; }
+-    if test "$cross_compiling" = yes; then :
+-     # cross-compilation
+-            as_fn_error $? "cross-compilation is unsupported, sorry" "$LINENO" 5
+-            ds_sqlite_headers_success=no
+-
+-else
+-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+-/* end confdefs.h.  */
+-
+-        #include <sqlite3.h>
+-        #include <stdio.h>
+-        #include <stdlib.h>
+-        #ifdef HAVE_UNISTD_H
+-        #   include <unistd.h>
+-        #endif
+-        #ifdef HAVE_ERRNO_H
+-        #   include <errno.h>
+-        #endif
+-
+-        #define OUTFILE "conftest.libsqlitever"
+-
+-        int main(void)
+-        {
+-            FILE* fd;
+-            int rc;
+-
+-            rc = unlink(OUTFILE);   /* avoid symlink attack */
+-            if (rc < 0 && errno != ENOENT)
+-            {
+-                fprintf(stderr, "error unlinking '%s'", OUTFILE);
+-                exit(1);
+-            }
+-
+-            fd = fopen(OUTFILE, "w");
+-            if (!fd)
+-            {
+-                /* Don't try to investigate errno for portability reasons */
+-                fprintf(stderr, "error opening '%s' for writing", OUTFILE);
+-                exit(1);
+-            }
+-
+-            rc = fprintf(fd, "%s", SQLITE_VERSION);
+-            if (rc < 0)
+-            {
+-                fprintf(stderr, "error writing to the '%s'", OUTFILE);
+-                exit(1);
+-            }
+-            exit(0);
+-        }
+-
+-_ACEOF
+-if ac_fn_c_try_run "$LINENO"; then :
+-
+-
+-            ds_sqlite_headers_verstr=`cat conftest.libsqlitever`
+-            ds_sqlite_headers_version_major=`cat conftest.libsqlitever | $AWK -F. '{print $1}'`
+-            ds_sqlite_headers_version_minor=`cat conftest.libsqlitever | $AWK -F. '{print $2}'`
+-            ds_sqlite_headers_version_patchlevel=`cat conftest.libsqlitever | $AWK -F. '{print $3}'`
+-
+-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&5
+-$as_echo "$ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&6; }
+-
+-else
+-
+-            { $as_echo "$as_me:${as_lineno-$LINENO}: result: failure (unsupported version?)" >&5
+-$as_echo "failure (unsupported version?)" >&6; }
+-            ds_sqlite_headers_success=no
+-
+-fi
+-rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+-  conftest.$ac_objext conftest.beam conftest.$ac_ext
+-fi
++    # if test "$cross_compiling" = yes; then :
++#      # cross-compilation
++#             as_fn_error $? "cross-compilation is unsupported, sorry" "$LINENO" 5
++#             ds_sqlite_headers_success=no
++
++# else
++#   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++# /* end confdefs.h.  */
++
++#         #include <sqlite3.h>
++#         #include <stdio.h>
++#         #include <stdlib.h>
++#         #ifdef HAVE_UNISTD_H
++#         #   include <unistd.h>
++#         #endif
++#         #ifdef HAVE_ERRNO_H
++#         #   include <errno.h>
++#         #endif
++
++#         #define OUTFILE "conftest.libsqlitever"
++
++#         int main(void)
++#         {
++#             FILE* fd;
++#             int rc;
++
++#             rc = unlink(OUTFILE);   /* avoid symlink attack */
++#             if (rc < 0 && errno != ENOENT)
++#             {
++#                 fprintf(stderr, "error unlinking '%s'", OUTFILE);
++#                 exit(1);
++#             }
++
++#             fd = fopen(OUTFILE, "w");
++#             if (!fd)
++#             {
++#                 /* Don't try to investigate errno for portability reasons */
++#                 fprintf(stderr, "error opening '%s' for writing", OUTFILE);
++#                 exit(1);
++#             }
++
++#             rc = fprintf(fd, "%s", SQLITE_VERSION);
++#             if (rc < 0)
++#             {
++#                 fprintf(stderr, "error writing to the '%s'", OUTFILE);
++#                 exit(1);
++#             }
++#             exit(0);
++#         }
++
++# _ACEOF
++# if ac_fn_c_try_run "$LINENO"; then :
++
++
++#             ds_sqlite_headers_verstr=`cat conftest.libsqlitever`
++#             ds_sqlite_headers_version_major=`cat conftest.libsqlitever | $AWK -F. '{print $1}'`
++#             ds_sqlite_headers_version_minor=`cat conftest.libsqlitever | $AWK -F. '{print $2}'`
++#             ds_sqlite_headers_version_patchlevel=`cat conftest.libsqlitever | $AWK -F. '{print $3}'`
++
++#             { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&5
++# $as_echo "$ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&6; }
++
++# else
++
++#             { $as_echo "$as_me:${as_lineno-$LINENO}: result: failure (unsupported version?)" >&5
++# $as_echo "failure (unsupported version?)" >&6; }
++#             ds_sqlite_headers_success=no
++
++# fi
++# rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
++#   conftest.$ac_objext conftest.beam conftest.$ac_ext
++# fi
++
++ds_sqlite_headers_verstr=`3.7.16.1`
++ds_sqlite_headers_version_major=`echo 3.7.16.1 | $AWK -F. '{print $1}'`
++ds_sqlite_headers_version_minor=`echo 3.7.16.1 | $AWK -F. '{print $2}'`
++ds_sqlite_headers_version_patchlevel=`echo 3.7.16.1 | $AWK -F. '{print $3}'`
++
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&5
++  $as_echo "$ds_sqlite_headers_version_major.$ds_sqlite_headers_version_minor.$ds_sqlite_headers_version_patchlevel" >&6; }
+ 
+     ac_ext=c
+ ac_cpp='$CPP $CPPFLAGS'
+diff --git a/src/dspam.conf.in b/src/dspam.conf.in
+--- a/src/dspam.conf.in
++++ b/src/dspam.conf.in
+@@ -693,8 +693,8 @@ LocalMX 127.0.0.1
+ # Logging: Disabling logging for users will make usage graphs unavailable to
+ # them. Disabling system logging will make admin graphs unavailable.
+ #
+-SystemLog	on
+-UserLog		on
++SystemLog	off
++UserLog		off
+ 
+ #
+ # TrainPristine: for systems where the original message remains server side
+diff --git a/src/libdspam.c b/src/libdspam.c
+--- a/src/libdspam.c
++++ b/src/libdspam.c
+@@ -48,7 +48,9 @@ void *_drv_handle;
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <fcntl.h>
++#ifndef _NEWLIB_VERSION
+ #include <dlfcn.h>
++#endif
+ 
+ #ifdef TIME_WITH_SYS_TIME
+ #   include <sys/time.h>
+@@ -86,6 +88,8 @@ void *_drv_handle;
+ int DO_DEBUG = 0;
+ #endif
+ 
++int dspam_load_db_to_mem = 0;
++
+ /*
+  * dspam_init()
+  *
+diff --git a/src/libdspam.h b/src/libdspam.h
+--- a/src/libdspam.h
++++ b/src/libdspam.h
+@@ -45,6 +45,8 @@ extern "C" {
+ 
+ #define BNR_SIZE 3
+ 
++extern int dspam_load_db_to_mem;
++
+ /* Public API */
+ 
+ int libdspam_init(const char *);
+diff --git a/src/sqlite3_drv.c b/src/sqlite3_drv.c
+--- a/src/sqlite3_drv.c
++++ b/src/sqlite3_drv.c
+@@ -719,7 +719,11 @@ _ds_init_storage (DSPAM_CTX * CTX, void *dbh)
+ 
+   noexist = stat(filename, &st);
+ 
+-  if (dbh)
++  if (dspam_load_db_to_mem) {
++    if (noexist || dbh || (sqlite3_open(":memory:", &s->dbh))!=SQLITE_OK) {
++      s->dbh = NULL;
++    }
++  } else if (dbh)
+     s->dbh = dbh;
+   else if ((sqlite3_open(filename, &s->dbh))!=SQLITE_OK)
+     s->dbh = NULL;
+@@ -737,7 +741,7 @@ _ds_init_storage (DSPAM_CTX * CTX, void *dbh)
+ 
+   /* Create database objects */
+ 
+-  if (noexist) {
++  if (noexist || dspam_load_db_to_mem) {
+ 
+     LOGDEBUG ("_ds_init_storage: Creating object structure in database: %s", filename);
+ 
+@@ -787,6 +791,7 @@ _ds_init_storage (DSPAM_CTX * CTX, void *dbh)
+     buff[0] = 0;
+   }
+ 
++  if (!dspam_load_db_to_mem) {
+   if (_ds_read_attribute(CTX->config->attributes, "SQLitePragma")) {
+     char pragma[1024];
+     attribute_t t = _ds_find_attribute(CTX->config->attributes, "SQLitePragma");
+@@ -814,6 +819,63 @@ _ds_init_storage (DSPAM_CTX * CTX, void *dbh)
+       fclose(file);
+     }
+   }
++  }
++
++  if (dspam_load_db_to_mem) {
++    buff[0] = 0;
++    snprintf (buff, sizeof (buff),
++                "ATTACH DATABASE \'%s\' AS diskDB", filename);
++    if ((sqlite3_exec(s->dbh, buff, NULL, NULL, &err))!=SQLITE_OK) {
++      _sqlite_drv_query_error (err, buff);
++      free(s);
++      return EFAILURE;
++    }
++
++    buff[0] = 0;
++    snprintf (buff, sizeof (buff),
++                "INSERT INTO dspam_token_data (token,spam_hits,innocent_hits,last_hit) "
++                "SELECT token,spam_hits,innocent_hits,last_hit FROM diskDB.dspam_token_data");
++    if ((sqlite3_exec(s->dbh, buff, NULL, NULL, &err))!=SQLITE_OK) {
++      _sqlite_drv_query_error (err, buff);
++      free(s);
++      return EFAILURE;
++    }
++
++    buff[0] = 0;
++    snprintf (buff, sizeof (buff),
++                "INSERT INTO dspam_signature_data (signature,data,created_on)"
++                "SELECT signature,data,created_on FROM diskDB.dspam_signature_data");
++    if ((sqlite3_exec(s->dbh, buff, NULL, NULL, &err))!=SQLITE_OK) {
++      _sqlite_drv_query_error (err, buff);
++      free(s);
++      return EFAILURE;
++    }
++
++    buff[0] = 0;
++    snprintf (buff, sizeof (buff),
++                "INSERT INTO dspam_stats (dspam_stat_id,spam_learned,innocent_learned,"
++                "spam_misclassified,innocent_misclassified,"
++                "spam_corpusfed,innocent_corpusfed,"
++                "spam_classified,innocent_classified) "
++                "SELECT dspam_stat_id,spam_learned,innocent_learned,"
++                "spam_misclassified,innocent_misclassified,spam_corpusfed,innocent_corpusfed,"
++                "spam_classified,innocent_classified "
++                "FROM diskDB.dspam_stats");
++    if ((sqlite3_exec(s->dbh, buff, NULL, NULL, &err))!=SQLITE_OK) {
++      _sqlite_drv_query_error (err, buff);
++      free(s);
++      return EFAILURE;
++    }
++
++    buff[0] = 0;
++    snprintf (buff, sizeof (buff),
++                "DETACH DATABASE diskDB");
++    if ((sqlite3_exec(s->dbh, buff, NULL, NULL, &err))!=SQLITE_OK) {
++      _sqlite_drv_query_error (err, buff);
++      free(s);
++      return EFAILURE;
++    }
++  }
+ 
+   CTX->storage = s;
+ 
+@@ -1311,14 +1373,19 @@ _ds_get_nextsignature (DSPAM_CTX * CTX)
+ void
+ _sqlite_drv_query_error (const char *error, const char *query)
+ {
++  // turn off logging in file
++#if 0
+   FILE *file;
+   time_t tm = time (NULL);
+   char ct[128];
+   char fn[MAX_FILENAME_LENGTH];
++#endif
+ 
+   LOG (LOG_WARNING, "query error: %s: see sql.errors for more details",
+        error);
+ 
++  // turn off logging in file
++#if 0
+   snprintf (fn, sizeof (fn), "%s/sql.errors", LOGDIR);
+ 
+   snprintf (ct, sizeof (ct), "%s", ctime (&tm));
+@@ -1335,6 +1402,7 @@ _sqlite_drv_query_error (const char *error, const char *query)
+     fprintf (file, "[%s] %d: %s: %s\n", ct, (int) getpid (), error, query);
+     fclose (file);
+   }
++#endif
+ 
+   free((char *)error);
+   return;
+diff --git a/src/util.c b/src/util.c
+--- a/src/util.c
++++ b/src/util.c
+@@ -722,7 +722,7 @@ double chi2Q (double x, int v)
+ void timeout(void) {}
+ 
+ int _ds_get_fcntl_lock(int fd) {
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+   return 0;
+ #else
+   struct flock f;
+@@ -750,7 +750,7 @@ int _ds_get_fcntl_lock(int fd) {
+ }
+ 
+ int _ds_free_fcntl_lock(int fd) {
+-#ifdef _WIN32
++#if defined(_WIN32) || defined(__native_client__)
+   return 0;
+ #else
+   struct flock f;

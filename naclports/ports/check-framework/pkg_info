@@ -1,0 +1,7 @@
+NAME=check-framework
+VERSION=0.10.0
+ARCHIVE_ROOT=check-0.10.0
+URL=http://downloads.sourceforge.net/project/check/check/0.10.0/check-0.10.0.tar.gz
+LICENSE=LGPL
+SHA1=35d3a53446aea7b21a770faedb358d0fc7cba76d
+DISABLED_TOOLCHAIN=(emscripten)

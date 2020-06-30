@@ -1,0 +1,7 @@
+NAME=jasper
+VERSION=1.900.1
+LICENSE=MIT
+URL=https://www.ece.uvic.ca/~frodo/jasper/software/jasper-1.900.1.zip
+DEPENDS=(jpeg9a)
+SHA1=9c5735f773922e580bf98c7c7dfda9bbed4c5191
+DISABLED_TOOLCHAIN=(emscripten)

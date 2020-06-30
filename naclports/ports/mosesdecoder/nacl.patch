@@ -1,0 +1,1463 @@
+diff --git a/Jamroot b/Jamroot
+--- a/Jamroot
++++ b/Jamroot
+@@ -81,8 +81,8 @@ include $(TOP)/jam-files/sanity.jam ;
+ boost 104400 ;
+ external-lib z ;
+ 
+-lib dl : : <runtime-link>static:<link>static <runtime-link>shared:<link>shared ;
+-requirements += <library>dl ;
++#lib dl : : <runtime-link>static:<link>static <runtime-link>shared:<link>shared ;
++#requirements += <library>dl ;
+ 
+ 
+ if ! [ option.get "without-tcmalloc" : : "yes" ] && [ test_library "tcmalloc_minimal" ] {
+diff --git a/OnDiskPt/Jamfile b/OnDiskPt/Jamfile
+--- a/OnDiskPt/Jamfile
++++ b/OnDiskPt/Jamfile
+@@ -1,5 +1,16 @@
+ fakelib OnDiskPt : OnDiskWrapper.cpp SourcePhrase.cpp TargetPhrase.cpp Word.cpp Phrase.cpp PhraseNode.cpp TargetPhraseCollection.cpp Vocab.cpp OnDiskQuery.cpp ../moses//headers ;
+ 
+-exe CreateOnDiskPt : Main.cpp ..//boost_filesystem ../moses//moses OnDiskPt ;
+-exe queryOnDiskPt : queryOnDiskPt.cpp ..//boost_filesystem ../moses//moses OnDiskPt ;
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++local extra_deps ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++	extra_deps += c++ nacl_sys_private ;
++}
++
++exe CreateOnDiskPt : Main.cpp ..//boost_filesystem ../moses//moses OnDiskPt pipeline crypto $(extra_deps) ;
++exe queryOnDiskPt : queryOnDiskPt.cpp ..//boost_filesystem ../moses//moses OnDiskPt pipeline crypto $(extra_deps) ;
+ 
+diff --git a/OnDiskPt/Main.cpp b/OnDiskPt/Main.cpp
+--- a/OnDiskPt/Main.cpp
++++ b/OnDiskPt/Main.cpp
+@@ -37,6 +37,8 @@
+ using namespace std;
+ using namespace OnDiskPt;
+ 
++const char* prog_name = "ONDISKPT";
++
+ int main (int argc, char * const argv[])
+ {
+   // insert code here...
+diff --git a/OnDiskPt/queryOnDiskPt.cpp b/OnDiskPt/queryOnDiskPt.cpp
+--- a/OnDiskPt/queryOnDiskPt.cpp
++++ b/OnDiskPt/queryOnDiskPt.cpp
+@@ -18,6 +18,8 @@ void usage();
+ 
+ typedef unsigned int uint;
+ 
++const char* prog_name = "QUERYONDISKPT";
++
+ int main(int argc, char **argv)
+ {
+   int tableLimit = 20;
+diff --git a/jam-files/boost-build/tools/gcc.jam b/jam-files/boost-build/tools/gcc.jam
+--- a/jam-files/boost-build/tools/gcc.jam
++++ b/jam-files/boost-build/tools/gcc.jam
+@@ -1068,7 +1068,6 @@ rule setup-threading ( targets * : sources * : properties * )
+             case * :
+             {
+                 option = -pthread ;
+-                libs = rt ;
+             }
+         }
+     
+diff --git a/jam-files/sanity.jam b/jam-files/sanity.jam
+--- a/jam-files/sanity.jam
++++ b/jam-files/sanity.jam
+@@ -25,6 +25,7 @@ rule shell_or_fail ( cmd ) {
+ cxxflags = [ os.environ "CXXFLAGS" ] ;
+ cflags = [ os.environ "CFLAGS" ] ;
+ ldflags = [ os.environ "LDFLAGS" ] ;
++cxx = [ option.get "with-cxx" : : "g++" ] ;
+ 
+ #Run g++ with empty main and these arguments to see if it passes.  
+ rule test_flags ( flags * : main ? ) {
+@@ -32,7 +33,7 @@ rule test_flags ( flags * : main ? ) {
+   if ! $(main) {
+     main = "int main() {}" ;
+   }
+-  local cmd = "bash -c \"g++ "$(flags:J=" ")" -x c++ - <<<'$(main)' -o $(TOP)/dummy >/dev/null 2>/dev/null && rm $(TOP)/dummy 2>/dev/null\"" ;
++  local cmd = "bash -c \"$(cxx) "$(flags:J=" ")" -x c++ - <<<'$(main)' -o $(TOP)/dummy >/dev/null 2>/dev/null && rm $(TOP)/dummy 2>/dev/null\"" ;
+   local ret = [ SHELL $(cmd) : exit-status ] ;
+   if --debug-configuration in [ modules.peek : ARGV ] {
+     echo $(cmd) ;
+@@ -159,7 +160,7 @@ rule boost-lib ( name macro : deps * ) {
+ 
+ #Argument is e.g. 103600
+ rule boost ( min-version ) {
+-  local cmd = "bash -c \"g++ "$(I-boost-include)" -dM -x c++ -E /dev/null -include boost/version.hpp 2>/dev/null |grep '#define BOOST_'\"" ;
++  local cmd = "bash -c \"$(cxx) "$(I-boost-include)" -dM -x c++ -E /dev/null -include boost/version.hpp 2>/dev/null |grep '#define BOOST_'\"" ;
+   local boost-shell = [ SHELL "$(cmd)" : exit-status ] ;
+   if $(boost-shell[2]) != 0 && $(CLEANING) = no {
+     echo Failed to run "$(cmd)" ;
+diff --git a/lm/Jamfile b/lm/Jamfile
+--- a/lm/Jamfile
++++ b/lm/Jamfile
+@@ -26,9 +26,13 @@ fakelib kenlm : $(wrappers) [ glob *.cc : *main.cc *test.cc ] ../util//kenutil :
+ 
+ import testing ;
+ 
+-run left_test.cc kenlm /top//boost_unit_test_framework : : test.arpa ;
+-run model_test.cc kenlm /top//boost_unit_test_framework : : test.arpa test_nounk.arpa ;
+-run partial_test.cc kenlm /top//boost_unit_test_framework : : test.arpa ;
++exe left_test : left_test.cc kenlm /top//boost_unit_test_framework ;
++exe model_test : model_test.cc kenlm /top//boost_unit_test_framework ;
++exe partial_test : partial_test.cc kenlm /top//boost_unit_test_framework ;
++
++#run left_test.cc kenlm /top//boost_unit_test_framework : : test.arpa ;
++#run model_test.cc kenlm /top//boost_unit_test_framework : : test.arpa test_nounk.arpa ;
++#run partial_test.cc kenlm /top//boost_unit_test_framework : : test.arpa ;
+ 
+ exes = ;
+ for local p in [ glob *_main.cc ] {
+diff --git a/lm/binary_format.cc b/lm/binary_format.cc
+--- a/lm/binary_format.cc
++++ b/lm/binary_format.cc
+@@ -135,7 +135,7 @@ void MatchCheck(ModelType model_type, unsigned int search_version, const Paramet
+ 
+ const std::size_t kInvalidSize = static_cast<std::size_t>(-1);
+ 
+-BinaryFormat::BinaryFormat(const Config &config) 
++BinaryFormat::BinaryFormat(const Config &config)
+   : write_method_(config.write_method), write_mmap_(config.write_mmap), load_method_(config.load_method),
+     header_size_(kInvalidSize), vocab_size_(kInvalidSize), vocab_string_offset_(kInvalidOffset) {}
+ 
+@@ -286,9 +286,11 @@ void BinaryFormat::MapFile(void *&vocab_base, void *&search_base) {
+ 
+ bool RecognizeBinary(const char *file, ModelType &recognized) {
+   util::scoped_fd fd(util::OpenReadOrThrow(file));
++#ifndef __native_client__
+   if (!IsBinaryFormat(fd.get())) {
+     return false;
+   }
++#endif
+   Parameters params;
+   ReadHeader(fd.get(), params);
+   recognized = params.fixed.model_type;
+diff --git a/lm/builder/Jamfile b/lm/builder/Jamfile
+--- a/lm/builder/Jamfile
++++ b/lm/builder/Jamfile
+@@ -9,5 +9,7 @@ exe dump_counts : dump_counts_main.cc builder ;
+ alias programs : lmplz dump_counts ;
+ 
+ import testing ;
+-unit-test corpus_count_test : corpus_count_test.cc builder /top//boost_unit_test_framework ;
+-unit-test adjust_counts_test : adjust_counts_test.cc builder /top//boost_unit_test_framework ;
++# unit-test corpus_count_test : corpus_count_test.cc builder /top//boost_unit_test_framework ;
++# unit-test adjust_counts_test : adjust_counts_test.cc builder /top//boost_unit_test_framework ;
++exe corpus_count_test : corpus_count_test.cc builder /top//boost_unit_test_framework ;
++exe adjust_counts_test : adjust_counts_test.cc builder /top//boost_unit_test_framework ;
+diff --git a/lm/model.cc b/lm/model.cc
+--- a/lm/model.cc
++++ b/lm/model.cc
+@@ -58,6 +58,20 @@ void CheckCounts(const std::vector<uint64_t> &counts) {
+ 
+ template <class Search, class VocabularyT> GenericModel<Search, VocabularyT>::GenericModel(const char *file, const Config &init_config) : backing_(init_config) {
+   util::scoped_fd fd(util::OpenReadOrThrow(file));
++#ifdef __native_client__
++  Parameters parameters;
++  int fd_shallow = fd.release();
++  backing_.InitializeBinary(fd_shallow, kModelType, kVersion, parameters);
++  CheckCounts(parameters.counts);
++
++  Config new_config(init_config);
++  new_config.probing_multiplier = parameters.fixed.probing_multiplier;
++  Search::UpdateConfigFromBinary(backing_, parameters.counts, VocabularyT::Size(parameters.counts[0], new_config), new_config);
++  UTIL_THROW_IF(new_config.enumerate_vocab && !parameters.fixed.has_vocabulary, FormatLoadException, "The decoder requested all the vocabulary strings, but this binary file does not have them.  You may need to rebuild the binary file with an updated version of build_binary.");
++
++  SetupMemory(backing_.LoadBinary(Size(parameters.counts, new_config)), parameters.counts, new_config);
++  vocab_.LoadedBinary(parameters.fixed.has_vocabulary, fd_shallow, new_config.enumerate_vocab, backing_.VocabStringReadingOffset());
++#else
+   if (IsBinaryFormat(fd.get())) {
+     Parameters parameters;
+     int fd_shallow = fd.release();
+@@ -75,6 +89,7 @@ template <class Search, class VocabularyT> GenericModel<Search, VocabularyT>::Ge
+     ComplainAboutARPA(init_config, kModelType);
+     InitializeFromARPA(fd.release(), file, init_config);
+   }
++#endif
+ 
+   // g++ prints warnings unless these are fully initialized.
+   State begin_sentence = State();
+diff --git a/mert/Jamfile b/mert/Jamfile
+--- a/mert/Jamfile
++++ b/mert/Jamfile
+@@ -71,18 +71,33 @@ exe kbmira : kbmira.cpp mert_lib ..//boost_program_options ..//boost_filesystem
+ 
+ alias programs : mert extractor evaluator pro kbmira sentence-bleu ;
+ 
+-unit-test bleu_scorer_test : BleuScorerTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test feature_data_test : FeatureDataTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test data_test : DataTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test forest_rescore_test : ForestRescoreTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test hypergraph_test : HypergraphTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test ngram_test : NgramTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test optimizer_factory_test : OptimizerFactoryTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test point_test : PointTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test reference_test : ReferenceTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test singleton_test : SingletonTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test timer_test : TimerTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test util_test : UtilTest.cpp mert_lib ..//boost_unit_test_framework ;
+-unit-test vocabulary_test : VocabularyTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test bleu_scorer_test : BleuScorerTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test feature_data_test : FeatureDataTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test data_test : DataTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test forest_rescore_test : ForestRescoreTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test hypergraph_test : HypergraphTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test ngram_test : NgramTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test optimizer_factory_test : OptimizerFactoryTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test point_test : PointTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test reference_test : ReferenceTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test singleton_test : SingletonTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test timer_test : TimerTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test util_test : UtilTest.cpp mert_lib ..//boost_unit_test_framework ;
++# unit-test vocabulary_test : VocabularyTest.cpp mert_lib ..//boost_unit_test_framework ;
++
++
++exe bleu_scorer_test : BleuScorerTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe feature_data_test : FeatureDataTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe data_test : DataTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe forest_rescore_test : ForestRescoreTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe hypergraph_test : HypergraphTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe ngram_test : NgramTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe optimizer_factory_test : OptimizerFactoryTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe point_test : PointTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe reference_test : ReferenceTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe singleton_test : SingletonTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe timer_test : TimerTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe util_test : UtilTest.cpp mert_lib ..//boost_unit_test_framework ;
++exe vocabulary_test : VocabularyTest.cpp mert_lib ..//boost_unit_test_framework ;
+ 
+ install legacy : programs : <location>. ;
+diff --git a/mert/Timer.cpp b/mert/Timer.cpp
+--- a/mert/Timer.cpp
++++ b/mert/Timer.cpp
+@@ -35,7 +35,7 @@ namespace MosesTuning
+ 
+ void Timer::GetCPUTimeMicroSeconds(Timer::CPUTime* cpu_time) const
+ {
+-#if !defined(_WIN32) && !defined(_WIN64)
++#if !defined(_WIN32) && !defined(_WIN64) && !defined(__native_client__)
+   struct rusage usage;
+   if (getrusage(RUSAGE_SELF, &usage)) {
+     TRACE_ERR("Error occurred: getrusage().\n");
+diff --git a/misc/1-1-Extraction.cpp b/misc/1-1-Extraction.cpp
+--- a/misc/1-1-Extraction.cpp
++++ b/misc/1-1-Extraction.cpp
+@@ -9,6 +9,8 @@
+ 
+ using namespace std;
+ 
++const char* prog_name = "1-1-Extraction";
++
+ 
+ int stringToInteger(string s)
+ {
+diff --git a/misc/GenerateSequences.cpp b/misc/GenerateSequences.cpp
+--- a/misc/GenerateSequences.cpp
++++ b/misc/GenerateSequences.cpp
+@@ -9,6 +9,8 @@
+ 
+ using namespace std;
+ 
++const char* prog_name = "GenerateSequences";
++
+ 
+ int stringToInteger(string s)
+ {
+diff --git a/misc/Jamfile b/misc/Jamfile
+--- a/misc/Jamfile
++++ b/misc/Jamfile
+@@ -1,24 +1,35 @@
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++local extra_deps ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++	extra_deps += c++ nacl_sys_private ;
++}
++
+ #exe processPhraseTable : GenerateTuples.cpp  processPhraseTable.cpp ..//boost_filesystem ../moses//moses ;
+ 
+-exe processLexicalTable : processLexicalTable.cpp ..//boost_filesystem ../moses//moses ;
++exe processLexicalTable : processLexicalTable.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
+ 
+ #exe queryPhraseTable : queryPhraseTable.cpp ..//boost_filesystem ../moses//moses ;
+ 
+-exe queryLexicalTable : queryLexicalTable.cpp ..//boost_filesystem ../moses//moses ;
++exe queryLexicalTable : queryLexicalTable.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
+ 
+-exe generateSequences : GenerateSequences.cpp ..//boost_filesystem ../moses//moses ; 
++exe generateSequences : GenerateSequences.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ; 
+ 
+-exe TMining : TransliterationMining.cpp ..//boost_filesystem ../moses//moses ;
++exe TMining : TransliterationMining.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
+ 
+-exe 1-1-Extraction : 1-1-Extraction.cpp ..//boost_filesystem ../moses//moses ;
++exe 1-1-Extraction : 1-1-Extraction.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
+ 
+-exe prunePhraseTable : prunePhraseTable.cpp ..//boost_filesystem ../moses//moses ..//boost_program_options  ;
++exe prunePhraseTable : prunePhraseTable.cpp ..//boost_filesystem ../moses//moses ..//boost_program_options  pipeline crypto $(extra_deps) ;
+ 
+ local with-cmph = [ option.get "with-cmph" ] ;
+ if $(with-cmph) {
+-    exe processPhraseTableMin : processPhraseTableMin.cpp ..//boost_filesystem ../moses//moses ;
+-    exe processLexicalTableMin : processLexicalTableMin.cpp ..//boost_filesystem ../moses//moses ;
+-    exe queryPhraseTableMin : queryPhraseTableMin.cpp ..//boost_filesystem ../moses//moses ;
++    exe processPhraseTableMin : processPhraseTableMin.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
++    exe processLexicalTableMin : processLexicalTableMin.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
++    exe queryPhraseTableMin : queryPhraseTableMin.cpp ..//boost_filesystem ../moses//moses pipeline crypto $(extra_deps) ;
+ 
+     alias programsMin : processPhraseTableMin processLexicalTableMin queryPhraseTableMin ;
+ #    alias programsMin : processPhraseTableMin processLexicalTableMin ;
+@@ -44,6 +55,7 @@ merge-sorted.cc
+ ../moses/TranslationModel/UG/generic//generic 
+ $(TOP)//boost_iostreams 
+ $(TOP)//boost_program_options 
++pipeline crypto $(extra_deps) 
+ ; 
+ 
+ alias programs : 1-1-Extraction TMining generateSequences processLexicalTable queryLexicalTable programsMin programsProbing merge-sorted prunePhraseTable  ;
+diff --git a/misc/TransliterationMining.cpp b/misc/TransliterationMining.cpp
+--- a/misc/TransliterationMining.cpp
++++ b/misc/TransliterationMining.cpp
+@@ -25,6 +25,8 @@ using namespace std;
+ double initTransitionProb;
+ double LAMBDA;
+ 
++const char* prog_name = "TMining";
++
+ double addLogProbs(double A , double B)   // this function adds probabilities ...
+ {
+ 
+diff --git a/misc/merge-sorted.cc b/misc/merge-sorted.cc
+--- a/misc/merge-sorted.cc
++++ b/misc/merge-sorted.cc
+@@ -10,6 +10,8 @@ using namespace std;
+ using namespace ugdiss;
+ using namespace boost::iostreams;
+ 
++const char* prog_name = "merge-sorted";
++
+ typedef boost::shared_ptr<filtering_istream> fptr;
+ 
+ class Part
+@@ -19,10 +21,10 @@ class Part
+   string my_lines[2];
+   size_t         ctr;
+ public:
+-  string const& line() const 
+-  { 
++  string const& line() const
++  {
+     static string empty_line;
+-    return f ? my_lines[ctr%2] : empty_line; 
++    return f ? my_lines[ctr%2] : empty_line;
+   }
+ 
+   Part(string _fname) : ctr(0)
+@@ -32,7 +34,7 @@ public:
+     if (!getline(*f, my_lines[0])) f.reset();
+   }
+ 
+-  bool next() 
++  bool next()
+   {
+     if (!f) return false;
+     if (!getline(*f, my_lines[++ctr%2]))
+@@ -45,16 +47,16 @@ public:
+     return true;
+   }
+ 
+-  bool operator <(Part const& other) const 
++  bool operator <(Part const& other) const
+   { return line() < other.line(); }
+ 
+-  bool operator <=(Part const& other) const 
++  bool operator <=(Part const& other) const
+   { return line() <= other.line(); }
+ 
+-  bool operator >(Part const& other) const 
++  bool operator >(Part const& other) const
+   { return line() > other.line(); }
+ 
+-  bool operator >=(Part const& other) const 
++  bool operator >=(Part const& other) const
+   { return line() >= other.line(); }
+ 
+   bool go(ostream& out)
+@@ -66,20 +68,20 @@ public:
+         out << fname << "-" << ctr - 1 << "-";
+         out << my_lines[(ctr - 1)%2] << endl;
+       }
+-    do 
++    do
+       {
+         out << fname << " " << ctr << " ";
+         out << line() << "\n";
+       }
+     while (next() && my_lines[0] == my_lines[1]);
+ #else
+-    do    { out << line() << "\n"; } 
++    do    { out << line() << "\n"; }
+     while (next() && my_lines[0] == my_lines[1]);
+     out.flush();
+ #endif
+     return f != NULL;
+   }
+-  
++
+ };
+ 
+ 
+diff --git a/misc/processLexicalTable.cpp b/misc/processLexicalTable.cpp
+--- a/misc/processLexicalTable.cpp
++++ b/misc/processLexicalTable.cpp
+@@ -7,6 +7,8 @@
+ 
+ using namespace Moses;
+ 
++const char* prog_name = "processLexicalTable";
++
+ Timer timer;
+ 
+ void printHelp()
+diff --git a/misc/processLexicalTableMin.cpp b/misc/processLexicalTableMin.cpp
+--- a/misc/processLexicalTableMin.cpp
++++ b/misc/processLexicalTableMin.cpp
+@@ -11,6 +11,8 @@
+ 
+ using namespace Moses;
+ 
++const char* prog_name = "processLexicalTableMin";
++
+ void printHelp(char **argv)
+ {
+   std::cerr << "Usage " << argv[0] << ":\n"
+diff --git a/misc/processPhraseTableMin.cpp b/misc/processPhraseTableMin.cpp
+--- a/misc/processPhraseTableMin.cpp
++++ b/misc/processPhraseTableMin.cpp
+@@ -11,6 +11,8 @@
+ 
+ using namespace Moses;
+ 
++const char* prog_name = "processPhaseTableMin";
++
+ void printHelp(char **argv)
+ {
+   std::cerr << "Usage " << argv[0] << ":\n"
+diff --git a/misc/prunePhraseTable.cpp b/misc/prunePhraseTable.cpp
+--- a/misc/prunePhraseTable.cpp
++++ b/misc/prunePhraseTable.cpp
+@@ -53,6 +53,8 @@ using namespace std;
+ namespace po = boost::program_options;
+ typedef multimap<float,string> Lines;
+ 
++const char* prog_name = "prunePhraseTable";
++
+ static void usage(const po::options_description& desc, char** argv)
+ {
+   cerr << "Usage: " + string(argv[0]) +  " [options] input-file output-file" << endl;
+diff --git a/misc/queryLexicalTable.cpp b/misc/queryLexicalTable.cpp
+--- a/misc/queryLexicalTable.cpp
++++ b/misc/queryLexicalTable.cpp
+@@ -9,6 +9,8 @@
+ 
+ using namespace Moses;
+ 
++const char* prog_name = "queryLexicalTable";
++
+ Timer timer;
+ 
+ void printHelp()
+diff --git a/misc/queryPhraseTableMin.cpp b/misc/queryPhraseTableMin.cpp
+--- a/misc/queryPhraseTableMin.cpp
++++ b/misc/queryPhraseTableMin.cpp
+@@ -16,6 +16,8 @@ typedef unsigned int uint;
+ 
+ using namespace Moses;
+ 
++const char* prog_name = "queryPhaseTableMin";
++
+ int main(int argc, char **argv)
+ {
+   int nscores = 4;
+diff --git a/moses-cmd/Jamfile b/moses-cmd/Jamfile
+--- a/moses-cmd/Jamfile
++++ b/moses-cmd/Jamfile
+@@ -1,7 +1,17 @@
+-alias deps :  ..//z ..//boost_iostreams ..//boost_filesystem ../moses//moses ;
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
+ 
+-exe moses : Main.cpp deps ;
+-exe vwtrainer : MainVW.cpp deps ;
+-exe lmbrgrid : LatticeMBRGrid.cpp deps ;
+-alias programs : moses lmbrgrid vwtrainer ;
++alias deps : ..//z ..//boost_iostreams ..//boost_filesystem ../moses//moses pipeline crypto ;
++local extra_deps ;
+ 
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++	extra_deps += c++ nacl_sys_private ;
++}
++
++exe moses : Main.cpp deps $(extra_deps) ;
++exe vwtrainer : MainVW.cpp deps $(extra_deps) ;
++exe lmbrgrid : LatticeMBRGrid.cpp deps $(extra_deps) ;
++alias programs : moses lmbrgrid vwtrainer $(extra_deps) ;
+diff --git a/moses-cmd/LatticeMBRGrid.cpp b/moses-cmd/LatticeMBRGrid.cpp
+--- a/moses-cmd/LatticeMBRGrid.cpp
++++ b/moses-cmd/LatticeMBRGrid.cpp
+@@ -56,6 +56,8 @@ POSSIBILITY OF SUCH DAMAGE.
+ using namespace std;
+ using namespace Moses;
+ 
++const char* prog_name = "LMBRGRID";
++
+ //keys
+ enum gridkey {lmbr_p,lmbr_r,lmbr_prune,lmbr_scale};
+ 
+diff --git a/moses-cmd/Main.cpp b/moses-cmd/Main.cpp
+--- a/moses-cmd/Main.cpp
++++ b/moses-cmd/Main.cpp
+@@ -59,6 +59,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ using namespace std;
+ using namespace Moses;
+ 
++const char* prog_name = "MOSES";
++
+ namespace Moses
+ {
+ 
+@@ -76,6 +78,8 @@ void OutputFeatureWeightsForHypergraph(std::ostream &outputSearchGraphStream)
+ int main(int argc, char** argv)
+ {
+   try {
++    bool output_app_label = false;
++    bool for_nacl_pipeline = false;
+ 
+ #ifdef HAVE_PROTOBUF
+     GOOGLE_PROTOBUF_VERIFY_VERSION;
+@@ -99,6 +103,9 @@ int main(int argc, char** argv)
+       exit(1);
+     }
+ 
++    if (params.isParamSpecified("output_app_label")) {
++      output_app_label = true;
++    }
+ 
+     // initialize all "global" variables, which are stored in StaticData
+     // note: this also loads models such as the language model, etc.
+@@ -106,6 +113,25 @@ int main(int argc, char** argv)
+       exit(1);
+     }
+ 
++    if (StaticData::Instance().IsNaclPipeline()) {
++      for_nacl_pipeline = true;
++      WorkSpec *spec = WorkSpec_parse(argv[argc - 1]);
++      if (!spec || spec->n <= 0) {
++        cerr << "!no spec\n";
++        exit(2);
++      }
++      if (setup_for_work(spec)) {
++        cerr << "!failed to setup for work\n";
++        exit(2);
++      }
++      work_ctx pipeline_ctx = alloc_ctx();
++      if (!pipeline_ctx) {
++        cerr << "!no pipeline_ctx\n";
++        exit(2);
++      }
++      StaticData::InstanceNonConst().SetWorkCtx(pipeline_ctx);
++    }
++
+     // setting "-show-weights" -> just dump out weights and exit
+     if (params.isParamSpecified("show-weights")) {
+       ShowWeights();
+@@ -115,7 +141,6 @@ int main(int argc, char** argv)
+     // shorthand for accessing information in StaticData
+     const StaticData& staticData = StaticData::Instance();
+ 
+-
+     //initialise random numbers
+     srand(time(NULL));
+ 
+@@ -145,6 +170,65 @@ int main(int argc, char** argv)
+     // main loop over set of input sentences
+     InputType* source = NULL;
+     size_t lineCount = staticData.GetStartTranslationId();
++    std::cerr << "Ready for input\n";
++
++    if (staticData.IsNaclPipeline()) {
++      while (1) {
++#ifdef __native_client__
++        if (wait_for_chan(output_app_label, NULL, NULL, NULL, NULL, NULL)) {
++          std::cerr << "!wait for chan failed\n";
++          return 2;
++        }
++#endif
++        bool ret = ioWrapper->ReadInput(staticData.GetInputType(),source);
++        if (!ret) {
++          break;
++        }
++        source->SetTranslationId(lineCount);
++        IFVERBOSE(1) {
++          ResetUserTime();
++        }
++
++        FeatureFunction::CallChangeSource(source);
++
++        // set up task of translating one sentence
++        TranslationTask* task = new TranslationTask(source, *ioWrapper);
++
++        // execute task
++#ifdef WITH_THREADS
++#ifdef PT_UG
++        bool spe = params.isParamSpecified("spe-src");
++        if (spe) {
++          // simulated post-editing: always run single-threaded!
++          task->Run();
++          delete task;
++          string src,trg,aln;
++          UTIL_THROW_IF2(!getline(*ioWrapper->spe_src,src), "[" << HERE << "] "
++                         << "missing update data for simulated post-editing.");
++          UTIL_THROW_IF2(!getline(*ioWrapper->spe_trg,trg), "[" << HERE << "] "
++                         << "missing update data for simulated post-editing.");
++          UTIL_THROW_IF2(!getline(*ioWrapper->spe_aln,aln), "[" << HERE << "] "
++                         << "missing update data for simulated post-editing.");
++          BOOST_FOREACH (PhraseDictionary* pd, PhraseDictionary::GetColl()) {
++            Mmsapt* sapt = dynamic_cast<Mmsapt*>(pd);
++            if (sapt) sapt->add(src,trg,aln);
++            VERBOSE(1,"[" << HERE << " added src] " << src << endl);
++            VERBOSE(1,"[" << HERE << " added trg] " << trg << endl);
++            VERBOSE(1,"[" << HERE << " added aln] " << aln << endl);
++          }
++        } else
++#endif
++          pool.Submit(task);
++#else
++        task->Run();
++        delete task;
++#endif
++
++        source = NULL; //make sure it doesn't get deleted
++        ++lineCount;
++      }
++    } else {
++    std::cerr << "Not for nacl pipeline\n";
+     while(ioWrapper->ReadInput(staticData.GetInputType(),source)) {
+       source->SetTranslationId(lineCount);
+       IFVERBOSE(1) {
+@@ -189,6 +273,7 @@ int main(int argc, char** argv)
+       source = NULL; //make sure it doesn't get deleted
+       ++lineCount;
+     }
++    }
+ 
+     // we are done, finishing up
+ #ifdef WITH_THREADS
+diff --git a/moses-cmd/MainVW.cpp b/moses-cmd/MainVW.cpp
+--- a/moses-cmd/MainVW.cpp
++++ b/moses-cmd/MainVW.cpp
+@@ -56,6 +56,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include "moses/TranslationModel/UG/generic/program_options/ug_splice_arglist.h"
+ #endif
+ 
++const char* prog_name = "VWTRAINER";
++
+ using namespace std;
+ using namespace Moses;
+ 
+diff --git a/moses/FF/ExternalFeature.cpp b/moses/FF/ExternalFeature.cpp
+--- a/moses/FF/ExternalFeature.cpp
++++ b/moses/FF/ExternalFeature.cpp
+@@ -1,11 +1,14 @@
+ #include "ExternalFeature.h"
++#ifndef __native_client__
+ #include <dlfcn.h>
++#endif
+ #include <stdlib.h>
+ #include <iostream>
+ #include "util/exception.hh"
+ 
+ using namespace std;
+ 
++#ifndef __native_client__
+ namespace Moses
+ {
+ ExternalFeatureState::ExternalFeatureState(int stateSize, void *data)
+@@ -69,4 +72,5 @@ FFState* ExternalFeature::EvaluateWhenApplied(
+ 
+ 
+ }
++#endif
+ 
+diff --git a/moses/FF/ExternalFeature.h b/moses/FF/ExternalFeature.h
+--- a/moses/FF/ExternalFeature.h
++++ b/moses/FF/ExternalFeature.h
+@@ -6,6 +6,7 @@
+ #include "StatefulFeatureFunction.h"
+ #include "FFState.h"
+ 
++#ifndef __native_client__
+ namespace Moses
+ {
+ class CdecFF;
+@@ -97,4 +98,4 @@ public:
+ };
+ 
+ }
+-
++#endif
+diff --git a/moses/FF/Factory.cpp b/moses/FF/Factory.cpp
+--- a/moses/FF/Factory.cpp
++++ b/moses/FF/Factory.cpp
+@@ -219,7 +219,9 @@ FeatureRegistry::FeatureRegistry()
+   MOSES_FNAME(ControlRecombination);
+   MOSES_FNAME(ConstrainedDecoding);
+   MOSES_FNAME(CoveredReferenceFeature);
++#ifndef __native_client__
+   MOSES_FNAME(ExternalFeature);
++#endif
+   MOSES_FNAME(SourceGHKMTreeInputMatchFeature);
+   MOSES_FNAME(SoftSourceSyntacticConstraintsFeature);
+   MOSES_FNAME(TreeStructureFeature);
+diff --git a/moses/Hypothesis.cpp b/moses/Hypothesis.cpp
+--- a/moses/Hypothesis.cpp
++++ b/moses/Hypothesis.cpp
+@@ -549,7 +549,6 @@ void Hypothesis::OutputSurface(std::ostream &out, const Hypothesis &edge, const
+         const Factor *factor = phrase.GetFactor(pos, outputFactorOrder[i]);
+         UTIL_THROW_IF2(factor == NULL,
+                        "No factor " << i << " at position " << pos);
+-
+         out << "|" << *factor;
+       }
+       out << " ";
+diff --git a/moses/Incremental.cpp b/moses/Incremental.cpp
+--- a/moses/Incremental.cpp
++++ b/moses/Incremental.cpp
+@@ -1,4 +1,5 @@
+ #include <stdexcept>
++#include <stdint.h>
+ 
+ #include "moses/Incremental.h"
+ 
+@@ -326,6 +327,7 @@ void Manager::OutputNBestList(OutputCollector *collector, const std::vector<sear
+     outputPhrase.RemoveWord(0);
+     outputPhrase.RemoveWord(outputPhrase.GetSize() - 1);
+     out << translationId << " ||| ";
++    std::cerr << "Calling output surface in OutputNBestList\n";
+     OutputSurface(out, outputPhrase, outputFactorOrder, false);
+     out << " ||| ";
+     features.OutputAllFeatureScores(out);
+@@ -495,7 +497,22 @@ void Manager::OutputBestHypo(OutputCollector *collector, search::Applied applied
+   outPhrase.RemoveWord(outPhrase.GetSize() - 1);
+   out << outPhrase.GetStringRep(StaticData::Instance().GetOutputFactorOrder());
+   out << '\n';
++  const StaticData &staticData = StaticData::Instance();
++  // if (staticData.IsNaclPipeline()) {
++  //   std::cerr << "Get to output result stage in pipeline\n";
++  //   char * data_pipeline = staticData.GetDataPipeline();
++  //   char * desc_pipeline = staticData.GetDescPipeline();
++  //   int64_t dlen_pipeline = staticData.GetDlenPipeline();
++  //   std::string out_str = out.str();
++  //   const char *out_cstr = out_str.c_str();
++  //   work_ctx pipeline_ctx = staticData.GetWorkCtx();
++  //   put_work_desc(pipeline_ctx, desc_pipeline, dlen_pipeline, (const unsigned char*)out_cstr, 1 + out_str.length());
++  //   free(data_pipeline);
++  //   free(desc_pipeline);
++  // } else {
++    std::cerr << "Get to output result stage not in pipeline\n";
+   collector->Write(translationId, out.str());
++  // }
+ 
+   VERBOSE(1,"BEST TRANSLATION: " << outPhrase << "[total=" << applied.GetScore() << "]" << std::endl);
+ }
+diff --git a/moses/Jamfile b/moses/Jamfile
+--- a/moses/Jamfile
++++ b/moses/Jamfile
+@@ -103,7 +103,7 @@ headers FF_Factory.o LM//LM TranslationModel/CompactPT//CompactPT TranslationMod
+ ..//search ../util/double-conversion//double-conversion ..//z ../OnDiskPt//OnDiskPt 
+ $(TOP)//boost_filesystem $(TOP)//boost_iostreams mmlib
+ :
+-<threading>single:<source>../util//rt
++#<threading>single:<source>../util//rt
+ ;
+ 
+ 
+@@ -111,5 +111,6 @@ alias headers-to-install : [ glob-tree *.h ] ;
+ 
+ import testing ;
+ 
+-unit-test moses_test : [ glob *Test.cpp Mock*.cpp FF/*Test.cpp ] ..//boost_filesystem moses headers ..//z ../OnDiskPt//OnDiskPt ..//boost_unit_test_framework ;
++# unit-test moses_test : [ glob *Test.cpp Mock*.cpp FF/*Test.cpp ] ..//boost_filesystem moses headers ..//z ../OnDiskPt//OnDiskPt ..//boost_unit_test_framework ;
++exe moses_test : [ glob *Test.cpp Mock*.cpp FF/*Test.cpp ] ..//boost_filesystem moses headers ..//z ../OnDiskPt//OnDiskPt ..//boost_unit_test_framework ;
+ 
+diff --git a/moses/LM/Jamfile b/moses/LM/Jamfile
+--- a/moses/LM/Jamfile
++++ b/moses/LM/Jamfile
+@@ -140,6 +140,7 @@ alias macros : : : : <define>$(lmmacros) ;
+ 
+ #Unit test for Backward LM
+ import testing ;
+-run BackwardTest.cpp ..//moses LM ../../lm//kenlm /top//boost_unit_test_framework : : backward.arpa ;
++exe BackwardTest :  BackwardTest.cpp ..//moses LM ../../lm//kenlm /top//boost_unit_test_framework ;
++#run BackwardTest.cpp ..//moses LM ../../lm//kenlm /top//boost_unit_test_framework : : backward.arpa ;
+ 
+ 
+diff --git a/moses/LM/Remote.cpp b/moses/LM/Remote.cpp
+--- a/moses/LM/Remote.cpp
++++ b/moses/LM/Remote.cpp
+@@ -41,7 +41,9 @@ bool LanguageModelRemote::start(const std::string& host, int port)
+   sock = socket(AF_INET, SOCK_STREAM, 0);
+   hp = gethostbyname(host.c_str());
+   if (hp==NULL) {
++#ifndef __native_client__
+     herror("gethostbyname failed");
++#endif
+     exit(1);
+   }
+ 
+diff --git a/moses/Manager.cpp b/moses/Manager.cpp
+--- a/moses/Manager.cpp
++++ b/moses/Manager.cpp
+@@ -24,6 +24,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #else
+ #include <ext/hash_set>
+ #endif
++#include <stdio.h>
++#include <string.h>
+ 
+ #include <algorithm>
+ #include <cmath>
+@@ -1578,9 +1580,20 @@ void Manager::OutputBest(OutputCollector *collector)  const
+         }
+       }
+     }
+-
++    if (StaticData::Instance().IsNaclPipeline()) {
++      char * data_pipeline = staticData.GetDataPipeline();
++      char * desc_pipeline = staticData.GetDescPipeline();
++      int64_t dlen_pipeline = staticData.GetDlenPipeline();
++      std::string out_str = out.str();
++      const char *out_cstr = out_str.c_str();
++      work_ctx pipeline_ctx = staticData.GetWorkCtx();
++      put_work_desc(pipeline_ctx, desc_pipeline, dlen_pipeline, (const unsigned char*)out_cstr, 1 + out_str.length());
++      free(data_pipeline);
++      free(desc_pipeline);
++    } else {
+     // report best translation to output collector
+     collector->Write(translationId,out.str(),debug.str());
++    }
+ 
+     decisionRuleTime.stop();
+     VERBOSE(1, "Line " << translationId << ": Decision rule took " << decisionRuleTime << " seconds total" << endl);
+diff --git a/moses/Parameter.cpp b/moses/Parameter.cpp
+--- a/moses/Parameter.cpp
++++ b/moses/Parameter.cpp
+@@ -25,6 +25,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include <fstream>
+ #include <sstream>
+ #include <algorithm>
++#include <pipeline/pipeline.h>
++#include <pipeline/worker.h>
+ #include "Parameter.h"
+ #include "Util.h"
+ #include "InputFileStream.h"
+@@ -215,6 +217,8 @@ Parameter::Parameter()
+   AddParam("spe-src", "Simulated post-editing. Source filename");
+   AddParam("spe-trg", "Simulated post-editing. Target filename");
+   AddParam("spe-aln", "Simulated post-editing. Alignment filename");
++  AddParam("for-nacl-pipeline", "Running moses decoder in a pipeline");
++  AddParam("output-app-label", "Whether output a label for the app");
+ }
+ 
+ Parameter::~Parameter()
+diff --git a/moses/Parameter.h b/moses/Parameter.h
+--- a/moses/Parameter.h
++++ b/moses/Parameter.h
+@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include <set>
+ #include <map>
+ #include <vector>
++#include <pipeline/worker.h>
+ #include "TypeDef.h"
+ #include "Util.h"
+ 
+diff --git a/moses/Sentence.cpp b/moses/Sentence.cpp
+--- a/moses/Sentence.cpp
++++ b/moses/Sentence.cpp
+@@ -22,6 +22,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ 
+ #include <stdexcept>
+ #include <boost/algorithm/string.hpp>
++#include <stdint.h>
++#include <pipeline/worker.h>
+ 
+ #include "Sentence.h"
+ #include "TranslationOptionCollectionText.h"
+@@ -32,6 +34,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include "Util.h"
+ #include "XmlOption.h"
+ #include "FactorCollection.h"
++#include "pipeline_util.h"
+ 
+ using namespace std;
+ 
+@@ -59,11 +62,40 @@ int Sentence::Read(std::istream& in,const std::vector<FactorType>& factorOrder)
+   std::string line;
+   std::map<std::string, std::string> meta;
+ 
+-  if (getline(in, line, '\n').eof())
++  const StaticData &staticData = StaticData::Instance();
++	bool naclPipeline = staticData.IsNaclPipeline();
++	if (naclPipeline) {
++		work_ctx pipeline_ctx = staticData.GetWorkCtx();
++		char* desc_pipeline;
++		int64_t dlen_pipeline;
++		char* data_pipeline;
++		int64_t len_pipeline;
++#ifdef __native_client__
++		int not_ready = get_work_desc(pipeline_ctx, &desc_pipeline, &dlen_pipeline,
++						(unsigned char**)&data_pipeline, &len_pipeline);
++		if (not_ready || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++		  std::cerr << "!not ready\n";
++		  return 2;
++		}
++#else
++		int ret1 = get_work_desc_single(pipeline_ctx, &desc_pipeline, &dlen_pipeline,
++						(unsigned char**)&data_pipeline, &len_pipeline);
++		if (ret1 || !desc_pipeline || !data_pipeline || len_pipeline <= 0) {
++		  std::cerr << "!not ready\n";
++			return 2;
++		}
++#endif
++		translation_request_info *tinfo = (translation_request_info *)data_pipeline;
++		line.assign(tinfo->text, tinfo->text_len);
++		staticData.SetDescDlenPipeline(desc_pipeline, dlen_pipeline);
++		staticData.SetDataLenPipeline(data_pipeline, len_pipeline);
++	} else {
++  if (getline(in, line, '\n').eof()) {
+     return 0;
++  }
++	}
+ 
+   //get covered words - if continual-partial-translation is switched on, parse input
+-  const StaticData &staticData = StaticData::Instance();
+   m_frontSpanCoveredLength = 0;
+   m_sourceCompleted.resize(0);
+   if (staticData.ContinuePartialTranslation()) {
+diff --git a/moses/StaticData.cpp b/moses/StaticData.cpp
+--- a/moses/StaticData.cpp
++++ b/moses/StaticData.cpp
+@@ -492,6 +492,12 @@ bool StaticData::LoadData(Parameter *parameter)
+     }
+   }
+ 
++  if (m_parameter->isParamSpecified("for-nacl-pipeline")) {
++    m_naclPipeline = true;
++  } else {
++    m_naclPipeline = false;
++  }
++
+   NoCache();
+   OverrideFeatures();
+ 
+diff --git a/moses/StaticData.h b/moses/StaticData.h
+--- a/moses/StaticData.h
++++ b/moses/StaticData.h
+@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include <utility>
+ #include <fstream>
+ #include <string>
++#include <pipeline/worker.h>
+ 
+ #ifdef WITH_THREADS
+ #include <boost/thread.hpp>
+@@ -81,6 +82,12 @@ protected:
+   m_translationOptionThreshold,
+   m_wordDeletionWeight;
+ 
++  work_ctx m_pipelineCtx;
++  bool m_naclPipeline;
++  mutable char* m_descPipeline;
++  mutable int64_t m_dlenPipeline;
++  mutable char* m_dataPipeline;
++  mutable int64_t m_lenPipeline;
+ 
+   // PhraseTrans, Generation & LanguageModelScore has multiple weights.
+   int				m_maxDistortion;
+@@ -798,6 +805,47 @@ public:
+     return m_requireSortingAfterSourceContext;
+   }
+ 
++  work_ctx GetWorkCtx() const {
++    return m_pipelineCtx;
++  }
++
++  void SetWorkCtx(work_ctx pipelineCtx) {
++    m_pipelineCtx = pipelineCtx;
++  }
++
++  void SetNaclPipeline(bool naclPipeline) {
++    m_naclPipeline = naclPipeline;
++  }
++
++  bool IsNaclPipeline() const {
++    return m_naclPipeline;
++  }
++
++  void SetDescDlenPipeline(char* desc_pipeline, int64_t dlen_pipeline) const {
++    m_dlenPipeline = dlen_pipeline;
++    m_descPipeline = desc_pipeline;
++  }
++
++  char* GetDescPipeline() const {
++    return m_descPipeline;
++  }
++
++  int64_t GetDlenPipeline() const {
++    return m_dlenPipeline;
++  }
++
++  void SetDataLenPipeline(char* data_pipeline, int64_t len_pipeline) const {
++    m_dataPipeline = data_pipeline;
++    m_lenPipeline = len_pipeline;
++  }
++
++  char* GetDataPipeline() const {
++    return m_dataPipeline;
++  }
++
++  int64_t GetLenPipeline() const {
++    return m_lenPipeline;
++  }
+ };
+ 
+ }
+diff --git a/moses/TranslationModel/CompactPT/MmapAllocator.h b/moses/TranslationModel/CompactPT/MmapAllocator.h
+--- a/moses/TranslationModel/CompactPT/MmapAllocator.h
++++ b/moses/TranslationModel/CompactPT/MmapAllocator.h
+@@ -29,7 +29,11 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ #include <unistd.h>
+ 
+ #ifndef __MMAN_PAGE_SIZE__
+-#define __MMAN_PAGE_SIZE__ sysconf(_SC_PAGE_SIZE)
++#ifndef __naitve_client__
++#define __MMAN_PAGE_SIZE__ sysconf(_SC_PAGESIZE)
++#else
++#define __MMAN_PAGE_SIZE__ 4096
++#endif
+ #endif
+ 
+ namespace Moses
+diff --git a/moses/TranslationModel/RuleTable/PhraseDictionaryFuzzyMatch.cpp b/moses/TranslationModel/RuleTable/PhraseDictionaryFuzzyMatch.cpp
+--- a/moses/TranslationModel/RuleTable/PhraseDictionaryFuzzyMatch.cpp
++++ b/moses/TranslationModel/RuleTable/PhraseDictionaryFuzzyMatch.cpp
+@@ -123,7 +123,7 @@ SetParameter(const std::string& key, const std::string& value)
+ 
+ int removedirectoryrecursively(const char *dirname)
+ {
+-#if defined __MINGW32__
++#if defined __MINGW32__ || defined(__native_client__)
+   //TODO(jie): replace this function with boost implementation
+ #else
+   DIR *dir;
+diff --git a/phrase-extract/Jamfile b/phrase-extract/Jamfile
+--- a/phrase-extract/Jamfile
++++ b/phrase-extract/Jamfile
+@@ -4,7 +4,19 @@ for local d in $(most-deps) {
+   obj $(d:B).o : $(d) ;
+ }
+ #and stuff them into an alias.
+-alias deps : $(most-deps:B).o ..//z ..//boost_iostreams ..//boost_filesystem ../moses//moses ../moses//ThreadPool ../moses//Util ../util//kenutil ;
++
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++local extra_deps ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++	extra_deps += c++ nacl_sys_private ;
++}
++
++alias deps : $(most-deps:B).o ..//z ..//boost_iostreams ..//boost_filesystem ../moses//moses ../moses//ThreadPool ../moses//Util ../util//kenutil pipeline crypto $(extra_deps) ;
+ 
+ #ExtractionPhrasePair.cpp requires that main define some global variables.  
+ #Build the mains that do not need these global variables.  
+@@ -15,5 +27,6 @@ for local m in [ glob *-main.cpp : score-main.cpp ] {
+ #The side dishes that use ExtractionPhrasePair.cpp
+ exe score : ExtractionPhrasePair.cpp score-main.cpp deps ;
+ 
+-import testing ;
+-run ScoreFeatureTest.cpp ExtractionPhrasePair.cpp deps ..//boost_unit_test_framework ..//boost_iostreams : : test.domain ;
++#import testing ;
++exe ScoreFeatureTest : ScoreFeatureTest.cpp ExtractionPhrasePair.cpp deps ..//boost_unit_test_framework ..//boost_iostreams ;
++#run ScoreFeatureTest.cpp ExtractionPhrasePair.cpp deps ..//boost_unit_test_framework ..//boost_iostreams : : test.domain ;
+diff --git a/phrase-extract/ScoreFeatureTest.cpp b/phrase-extract/ScoreFeatureTest.cpp
+--- a/phrase-extract/ScoreFeatureTest.cpp
++++ b/phrase-extract/ScoreFeatureTest.cpp
+@@ -30,6 +30,7 @@
+ using namespace MosesTraining;
+ using namespace std;
+ 
++const char* prog_name = "ScoreFeatureTest";
+ //pesky global variables
+ namespace MosesTraining
+ {
+diff --git a/phrase-extract/consolidate-direct-main.cpp b/phrase-extract/consolidate-direct-main.cpp
+--- a/phrase-extract/consolidate-direct-main.cpp
++++ b/phrase-extract/consolidate-direct-main.cpp
+@@ -28,6 +28,8 @@
+ 
+ using namespace std;
+ 
++const char* prog_name = "consolidate-direct";
++
+ vector< string > splitLine(const char *line)
+ {
+   vector< string > item;
+diff --git a/phrase-extract/consolidate-main.cpp b/phrase-extract/consolidate-main.cpp
+--- a/phrase-extract/consolidate-main.cpp
++++ b/phrase-extract/consolidate-main.cpp
+@@ -56,6 +56,8 @@ vector< string > splitLine(const char *line);
+ vector< int > countBin;
+ bool sparseCountBinFeatureFlag = false;
+ 
++const char* prog_name = "Consolidate";
++
+ int main(int argc, char* argv[])
+ {
+   cerr << "Consolidate v2.0 written by Philipp Koehn\n"
+diff --git a/phrase-extract/consolidate-reverse-main.cpp b/phrase-extract/consolidate-reverse-main.cpp
+--- a/phrase-extract/consolidate-reverse-main.cpp
++++ b/phrase-extract/consolidate-reverse-main.cpp
+@@ -41,6 +41,8 @@ bool getLine( istream &fileP, vector< string > &item );
+ string reverseAlignment(const string &alignments);
+ vector< string > splitLine(const char *lin);
+ 
++const char* prog_name = "consolidate-reverse";
++
+ inline void Tokenize(std::vector<std::string> &output
+                      , const std::string& str
+                      , const std::string& delimiters = " \t")
+diff --git a/phrase-extract/extract-ghkm/Main.cpp b/phrase-extract/extract-ghkm/Main.cpp
+--- a/phrase-extract/extract-ghkm/Main.cpp
++++ b/phrase-extract/extract-ghkm/Main.cpp
+@@ -19,6 +19,8 @@
+ 
+ #include "ExtractGHKM.h"
+ 
++const char* prog_name = "extract-ghkm";
++
+ int main(int argc, char *argv[])
+ {
+   Moses::GHKM::ExtractGHKM tool;
+diff --git a/phrase-extract/extract-lex-main.cpp b/phrase-extract/extract-lex-main.cpp
+--- a/phrase-extract/extract-lex-main.cpp
++++ b/phrase-extract/extract-lex-main.cpp
+@@ -8,6 +8,8 @@
+ using namespace std;
+ using namespace MosesTraining;
+ 
++const char* prog_name = "extract-lex";
++
+ float COUNT_INCR = 1;
+ 
+ void fix(std::ostream& stream)
+diff --git a/phrase-extract/extract-main.cpp b/phrase-extract/extract-main.cpp
+--- a/phrase-extract/extract-main.cpp
++++ b/phrase-extract/extract-main.cpp
+@@ -29,6 +29,8 @@
+ using namespace std;
+ using namespace MosesTraining;
+ 
++const char* prog_name = "extract";
++
+ namespace MosesTraining
+ {
+ 
+diff --git a/phrase-extract/extract-mixed-syntax/Jamfile b/phrase-extract/extract-mixed-syntax/Jamfile
+--- a/phrase-extract/extract-mixed-syntax/Jamfile
++++ b/phrase-extract/extract-mixed-syntax/Jamfile
+@@ -1,2 +1,12 @@
+-exe extract-mixed-syntax : Main.cpp AlignedSentence.cpp AlignedSentenceSyntax.cpp ConsistentPhrase.cpp ConsistentPhrases.cpp NonTerm.cpp Parameter.cpp Phrase.cpp pugixml.cpp Rule.cpp RulePhrase.cpp Rules.cpp RuleSymbol.cpp SyntaxTree.cpp Word.cpp ..//deps ../..//z ../..//boost_iostreams ../..//boost_program_options ../../moses//moses : <include>..  ;
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++local extra_deps ;
+ 
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++	extra_deps += c++ nacl_sys_private ;
++}
++
++exe extract-mixed-syntax : Main.cpp AlignedSentence.cpp AlignedSentenceSyntax.cpp ConsistentPhrase.cpp ConsistentPhrases.cpp NonTerm.cpp Parameter.cpp Phrase.cpp pugixml.cpp Rule.cpp RulePhrase.cpp Rules.cpp RuleSymbol.cpp SyntaxTree.cpp Word.cpp ..//deps ../..//z ../..//boost_iostreams ../..//boost_program_options ../../moses//moses pipeline crypto $(extra_deps) : <include>..  ;
+diff --git a/phrase-extract/extract-mixed-syntax/Main.cpp b/phrase-extract/extract-mixed-syntax/Main.cpp
+--- a/phrase-extract/extract-mixed-syntax/Main.cpp
++++ b/phrase-extract/extract-mixed-syntax/Main.cpp
+@@ -14,6 +14,8 @@ using namespace std;
+ 
+ bool g_debug = false;
+ 
++const char* prog_name = "extract-mixed-syntax";
++
+ int main(int argc, char** argv)
+ {
+   cerr << "Starting" << endl;
+diff --git a/phrase-extract/extract-rules-main.cpp b/phrase-extract/extract-rules-main.cpp
+--- a/phrase-extract/extract-rules-main.cpp
++++ b/phrase-extract/extract-rules-main.cpp
+@@ -53,6 +53,8 @@ using namespace MosesTraining;
+ typedef vector< int > LabelIndex;
+ typedef map< int, int > WordIndex;
+ 
++const char* prog_name = "extract-rules";
++
+ class ExtractTask
+ {
+ private:
+diff --git a/phrase-extract/filter-rule-table/Jamfile b/phrase-extract/filter-rule-table/Jamfile
+--- a/phrase-extract/filter-rule-table/Jamfile
++++ b/phrase-extract/filter-rule-table/Jamfile
+@@ -1 +1,10 @@
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++}
++
+ exe filter-rule-table : [ glob *.cpp ] ..//syntax-common ..//deps ../..//boost_iostreams ../..//boost_program_options ../..//z : <include>.. ;
+diff --git a/phrase-extract/filter-rule-table/Main.cpp b/phrase-extract/filter-rule-table/Main.cpp
+--- a/phrase-extract/filter-rule-table/Main.cpp
++++ b/phrase-extract/filter-rule-table/Main.cpp
+@@ -1,5 +1,7 @@
+ #include "FilterRuleTable.h"
+ 
++const char* prog_name = "filter-rule-table";
++
+ int main(int argc, char *argv[])
+ {
+   MosesTraining::Syntax::FilterRuleTable::FilterRuleTable tool;
+diff --git a/phrase-extract/relax-parse-main.cpp b/phrase-extract/relax-parse-main.cpp
+--- a/phrase-extract/relax-parse-main.cpp
++++ b/phrase-extract/relax-parse-main.cpp
+@@ -25,6 +25,8 @@
+ using namespace std;
+ using namespace MosesTraining;
+ 
++const char* prog_name = "relax-parse";
++
+ int main(int argc, char* argv[])
+ {
+   init( argc, argv ); // initialize from switches, set flags
+diff --git a/phrase-extract/score-main.cpp b/phrase-extract/score-main.cpp
+--- a/phrase-extract/score-main.cpp
++++ b/phrase-extract/score-main.cpp
+@@ -40,6 +40,8 @@
+ using namespace std;
+ using namespace MosesTraining;
+ 
++const char* prog_name = "score";
++
+ namespace MosesTraining
+ {
+ LexicalTable lexTable;
+diff --git a/phrase-extract/score-stsg/Jamfile b/phrase-extract/score-stsg/Jamfile
+--- a/phrase-extract/score-stsg/Jamfile
++++ b/phrase-extract/score-stsg/Jamfile
+@@ -1 +1,10 @@
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++}
++
+ exe score-stsg : [ glob *.cpp ] ..//syntax-common ..//deps ../..//boost_iostreams ../..//boost_program_options ../..//z : <include>.. ;
+diff --git a/phrase-extract/score-stsg/Main.cpp b/phrase-extract/score-stsg/Main.cpp
+--- a/phrase-extract/score-stsg/Main.cpp
++++ b/phrase-extract/score-stsg/Main.cpp
+@@ -1,4 +1,5 @@
+ #include "ScoreStsg.h"
++const char* prog_name = "score-stsg";
+ 
+ int main(int argc, char *argv[])
+ {
+diff --git a/phrase-extract/statistics-main.cpp b/phrase-extract/statistics-main.cpp
+--- a/phrase-extract/statistics-main.cpp
++++ b/phrase-extract/statistics-main.cpp
+@@ -18,6 +18,8 @@
+ using namespace std;
+ using namespace MosesTraining;
+ 
++const char* prog_name = "statistics";
++
+ namespace MosesTraining
+ {
+ 
+diff --git a/phrase-extract/syntax-common/Jamfile b/phrase-extract/syntax-common/Jamfile
+--- a/phrase-extract/syntax-common/Jamfile
++++ b/phrase-extract/syntax-common/Jamfile
+@@ -1,8 +1,18 @@
++lib crypto ;
++lib pipeline : crypto : <name>pipeline ;
++
++if --nacl-build in [ modules.peek : ARGV ]
++{
++	lib nacl_sys_private ;
++	lib c++ : nacl_sys_private : <name>c++ ;
++}
++
+ lib syntax_common : [ glob *.cc : *_test.cc ] ..//deps : <include>.. ;
+ 
+ import testing ;
+ 
+ for local t in [ glob *_test.cc ] {
+   local name = [ MATCH "(.*)\.cc" : $(t) ] ;
+-  unit-test $(name) : $(t) syntax_common /top//boost_unit_test_framework /top//boost_system ;
++  # unit-test $(name) : $(t) syntax_common /top//boost_unit_test_framework /top//boost_system ;
++  exe $(name) : $(t) syntax_common /top//boost_unit_test_framework /top//boost_system ;
+ }
+diff --git a/util/Jamfile b/util/Jamfile
+--- a/util/Jamfile
++++ b/util/Jamfile
+@@ -12,7 +12,7 @@ if [ test_library "lzma" ] && [ test_header "lzma.h" ] {
+ }
+ 
+ #rt is needed for clock_gettime on linux.  But it's already included with threading=multi
+-lib rt ;
++#lib rt ;
+ 
+ obj read_compressed.o : read_compressed.cc : $(compressed_flags) ;
+ alias read_compressed : read_compressed.o $(compressed_deps) ;
+@@ -21,7 +21,8 @@ obj file_piece_test.o : file_piece_test.cc /top//boost_unit_test_framework : $(c
+ 
+ fakelib parallel_read : parallel_read.cc : <threading>multi:<source>/top//boost_thread <threading>multi:<define>WITH_THREADS : : <include>.. ;
+ 
+-fakelib kenutil : bit_packing.cc ersatz_progress.cc exception.cc file.cc file_piece.cc mmap.cc murmur_hash.cc parallel_read pool.cc read_compressed scoped.cc string_piece.cc usage.cc double-conversion//double-conversion : <include>.. <os>LINUX,<threading>single:<source>rt : : <include>.. ;
++#fakelib kenutil : bit_packing.cc ersatz_progress.cc exception.cc file.cc file_piece.cc mmap.cc murmur_hash.cc parallel_read pool.cc read_compressed scoped.cc string_piece.cc usage.cc double-conversion//double-conversion : <include>.. <os>LINUX,<threading>single:<source>rt : : <include>.. ;
++fakelib kenutil : bit_packing.cc ersatz_progress.cc exception.cc file.cc file_piece.cc mmap.cc murmur_hash.cc parallel_read pool.cc read_compressed scoped.cc string_piece.cc usage.cc double-conversion//double-conversion : <include>.. : : <include>.. ;
+ 
+ exe cat_compressed : cat_compressed_main.cc kenutil ;
+ 
+@@ -29,8 +30,10 @@ alias programs : cat_compressed ;
+ 
+ import testing ;
+ 
+-run file_piece_test.o kenutil /top//boost_unit_test_framework : : file_piece.cc ;
++exe file_piece_test : file_piece_test.o kenutil /top//boost_unit_test_framework ;
++# run file_piece_test.o kenutil /top//boost_unit_test_framework : : file_piece.cc ;
+ for local t in [ glob *_test.cc : file_piece_test.cc read_compressed_test.cc ] {
+     local name = [ MATCH "(.*)\.cc" : $(t) ] ;
+-    unit-test $(name) : $(t) kenutil /top//boost_unit_test_framework /top//boost_system ;
++#    unit-test $(name) : $(t) kenutil /top//boost_unit_test_framework /top//boost_system ;
++    exe $(name) : $(t) kenutil /top//boost_unit_test_framework /top//boost_system ;
+ }
+diff --git a/util/mmap.cc b/util/mmap.cc
+--- a/util/mmap.cc
++++ b/util/mmap.cc
+@@ -32,14 +32,19 @@ long SizePage() {
+   SYSTEM_INFO si;
+   GetSystemInfo(&si);
+   return si.dwAllocationGranularity;
++#elif defined(__native_client__)
++  return 4096;
+ #else
+-  return sysconf(_SC_PAGE_SIZE);
++  return sysconf(_SC_PAGESIZE);
+ #endif
+ }
+ 
+ void SyncOrThrow(void *start, size_t length) {
+ #if defined(_WIN32) || defined(_WIN64)
+   UTIL_THROW_IF(!::FlushViewOfFile(start, length), ErrnoException, "Failed to sync mmap");
++#elif defined(__native_client__)
++  std::cerr << "msync is not supported\n";
++  abort();
+ #else
+   UTIL_THROW_IF(length && msync(start, length, MS_SYNC), ErrnoException, "Failed to sync mmap");
+ #endif
+@@ -56,7 +61,7 @@ void UnmapOrThrow(void *start, size_t length) {
+ scoped_mmap::~scoped_mmap() {
+   if (data_ != (void*)-1) {
+     try {
+-      // Thanks Denis Filimonov for pointing out NFS likes msync first.  
++      // Thanks Denis Filimonov for pointing out NFS likes msync first.
+       SyncOrThrow(data_, size_);
+       UnmapOrThrow(data_, size_);
+     } catch (const util::ErrnoException &e) {
+@@ -127,7 +132,7 @@ void *MapOrThrow(std::size_t size, bool for_write, int flags, bool prefault, int
+ }
+ 
+ const int kFileFlags =
+-#if defined(_WIN32) || defined(_WIN64)
++#if defined(_WIN32) || defined(_WIN64) || defined(__native_client__)
+   0 // MapOrThrow ignores flags on windows
+ #elif defined(MAP_FILE)
+   MAP_FILE | MAP_SHARED
+@@ -142,12 +147,12 @@ void MapRead(LoadMethod method, int fd, uint64_t offset, std::size_t size, scope
+       out.reset(MapOrThrow(size, false, kFileFlags, false, fd, offset), size, scoped_memory::MMAP_ALLOCATED);
+       break;
+     case POPULATE_OR_LAZY:
+-#ifdef MAP_POPULATE
++#if defined(MAP_POPULATE) && !defined(__native_client__)
+     case POPULATE_OR_READ:
+ #endif
+       out.reset(MapOrThrow(size, false, kFileFlags, true, fd, offset), size, scoped_memory::MMAP_ALLOCATED);
+       break;
+-#ifndef MAP_POPULATE
++#if !defined MAP_POPULATE || defined(__native_client__)
+     case POPULATE_OR_READ:
+ #endif
+     case READ:
+diff --git a/util/stream/Jamfile b/util/stream/Jamfile
+--- a/util/stream/Jamfile
++++ b/util/stream/Jamfile
+@@ -7,6 +7,9 @@
+ fakelib stream : chain.cc io.cc line_input.cc multi_progress.cc ..//kenutil /top//boost_thread : : : <library>/top//boost_thread ;
+ 
+ import testing ;
+-unit-test io_test : io_test.cc stream /top//boost_unit_test_framework ;
+-unit-test stream_test : stream_test.cc stream /top//boost_unit_test_framework ;
+-unit-test sort_test : sort_test.cc stream /top//boost_unit_test_framework ;
++# unit-test io_test : io_test.cc stream /top//boost_unit_test_framework ;
++# unit-test stream_test : stream_test.cc stream /top//boost_unit_test_framework ;
++# unit-test sort_test : sort_test.cc stream /top//boost_unit_test_framework ;
++exe io_test : io_test.cc stream /top//boost_unit_test_framework ;
++exe stream_test : stream_test.cc stream /top//boost_unit_test_framework ;
++exe sort_test : sort_test.cc stream /top//boost_unit_test_framework ;
+diff --git a/util/usage.cc b/util/usage.cc
+--- a/util/usage.cc
++++ b/util/usage.cc
+@@ -137,7 +137,7 @@ double WallTime() {
+ }
+ 
+ void PrintUsage(std::ostream &out) {
+-#if !defined(_WIN32) && !defined(_WIN64)
++#if !defined(_WIN32) && !defined(_WIN64) && !defined(__native_client__)
+   // Linux doesn't set memory usage in getrusage :-(
+   std::set<std::string> headers;
+   headers.insert("VmPeak:");

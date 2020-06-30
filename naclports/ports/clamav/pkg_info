@@ -1,0 +1,7 @@
+NAME=clamav
+VERSION=0.98.7
+URL=http://www.clamav.net/downloads/production/clamav-0.98.7.tar.gz
+LICENSE=GPLv2
+DEPENDS=(openssl zlib libxml2 ncurses bzip2 check-framework gmp curl libpipeline email-util)
+SHA1=c9793d67c041e2b944116d912f8681c8bd6e4432
+DISABLED_TOOLCHAIN=(emscripten)

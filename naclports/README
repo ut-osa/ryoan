@@ -1,0 +1,19 @@
+-----
+Build Instructions
+Tested on (last updated 2/5/17):
+ubuntu 16.04
+-----
+
+Step 0:
+Add the 32bit packages
+$ sudo dpkg --add-architecture i386
+$ sudo apt update
+
+Install the following ubuntu packages:
+gcc-multilib g++-multilib zlib1g-dev zlib1g-dev:i386
+libssl-dev:i386
+
+
+
+Step 1:
+./bootstrap.sh #this downloads the environment needed to build nacl

@@ -1,0 +1,4 @@
+NAME=health
+VERSION=0.1
+DEPENDS=(libpipeline enclave-header)
+DISABLED_TOOLCHAIN=(emscripten)

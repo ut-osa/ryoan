@@ -1,0 +1,4 @@
+svmsgd_test
+svmsgd_train
+svmsgd_classify
+*.o

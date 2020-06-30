@@ -1,0 +1,7 @@
+NAME=dspam
+VERSION=3.10.2
+URL=http://downloads.sourceforge.net/project/dspam/dspam/dspam-3.10.2/dspam-3.10.2.tar.gz
+LICENSE="Affero GNU Public License"
+SHA1=21133e0ee1880f3e8c849365b7e27a73f6d0413a
+DEPENDS=(sqlite)
+DISABLED_TOOLCHAIN=(emscripten)

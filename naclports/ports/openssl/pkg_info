@@ -1,0 +1,7 @@
+NAME=openssl
+VERSION=1.0.2e
+URL=http://www.openssl.org/source/openssl-1.0.2e.tar.gz
+LICENSE=CUSTOM:LICENSE
+DEPENDS=(glibc-compat)
+SHA1=2c5691496761cb18f98476eefa4d35c835448fb6
+DISABLED_TOOLCHAIN=(emscripten)
