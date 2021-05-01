@@ -2,10 +2,10 @@
 *.swp
 *.o
 *.a
-breakpad
-testing
-third_party
-ryoan_env.tar.xz
-root
-cscope.out
-build-*
+/breakpad
+/testing
+/third_party
+/ryoan_env.tar.xz
+/root
+/cscope.out
+/build-*
