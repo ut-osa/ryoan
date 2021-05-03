@@ -1,5 +1,5 @@
-config.log
-.sconf_temp
-scons-out
-toolchain
-cscope.out
+/config.log
+/.sconf_temp
+/scons-out
+/toolchain
+/cscope.out
