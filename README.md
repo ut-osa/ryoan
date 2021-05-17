@@ -1,17 +1,62 @@
-Ryoan
-=====
+Ryoan: A distributed sandbox for untrusted computation on secret data
+=====================================================================
 
-Ryoan is a distributed sandbox designed to confine untrusted code as it
-operates on sensitive data. The sandbox is further protected by SGX so that the
-even privileged software need not be trusted.
+Data-processing services are widely available on the Internet.  Individual users
+can conveniently access them for tasks including image editing (e.g., Pixlr),
+tax preparation (e.g., TurboTax), data analytics (e.g., SAS OnDemand) and even
+personal health analysis (23andMe).  However, user inputs to such services are
+often sensitive, such as tax documents and health data, which creates a dilemma
+for the user. In order to leverage the convenience and expertise of these
+services, the user must disclose sensitive data.  If the user wants to keep
+their data secret, they either have to give up using the services or hope that
+they can be trusted---that their service software will not leak data.
 
-This code is intended as a proof-of-concept research prototype and should *not*
-be used as is for security critical tasks.
+Ryoan, is a distributed sandbox that forces data-processing services to keep
+user data secret, without trusting the service's software stack.  Ryoan provides
+a sandbox to confine individual data-processing modules and prevent them from
+leaking data. Then it uses trusted hardware to allow a remote user to verify the
+integrity of individual sandbox instances and protect their execution.
+
+-------------------------------------------------------------------------------
+
+A single instance of Ryoan instance. Many instances may communicate in an
+application, supporting multiple code and data owners.
+
+<img src="images/softstack.png" alt="a single Ryoan instance" width="300">
+
+-------------------------------------------------------------------------------
+
+A key enabling technology for Ryoan is hardware enclave-protected execution
+(e.g., Intel's software guard extensions (SGX)), a hardware primitive that uses
+trusted hardware to protect a user-level computation from potentially malicious
+privileged software.
+
+Ryoan's security goal is simple: prevent leakage of secret data. However,
+  confining services over which the user has no control is challenging without a
+  centralized trusted platform.  We make the following contributions:
+
+ * A new execution model that allows mutually distrustful parties to process
+ sensitive data in a distributed fashion on untrusted infrastructure.
+
+ * The design and implementation of a prototype distributed sandbox that
+ confines untrusted code modules (possibly on different machines) and enforces
+ I/O policies that prevent leakage of secrets.
+
+ * Several case studies of real-world application scenarios to demonstrate how
+ they benefit from the secrecy guarantees of \sys, including an image processing
+ system, an email spam/virus filter, a personal health analysis tool, and a
+ machine translator.
+
+ * Evaluation of the performance characteristics of our prototype by measuring
+ the execution overheads of each of its building blocks: the SGX enclave,
+ confinement, and checkpoint/rollback.
+
+--------------------------------------------------------------------------------
 
 Please take a look at our publications for more details about the design:
  * Tyler Hunt, Zhiting Zhu, Yuanzhong Xu, Simon Peter, and Emmett Witchel.
  Ryoan: A distributed sandbox for untrusted computation on secret data. In
- [OSDI 2016](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/hunt)
+ [OSDI 2016 (best paper awardee!)](https://www.usenix.org/conference/osdi16/technical-sessions/presentation/hunt)
  and [TOCS Dec 2018](https://dl.acm.org/doi/10.1145/3231594).
 
 Ryoan is based on Google's
