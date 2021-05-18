@@ -55,20 +55,19 @@ A single instance of the Ryoan sandbox:
 
 Ryoan uses a system of labels to track the data stakeholders of messages as they
 travel from instance to instance. Messages are encrypted so that only other
-Ryoan instances can decrypt them as long as messages are labeled by some
-steakholder. Steakholders can only remove their own lables, and messages generaged
-are labeled by all un-removed labels from the input making it possible
-to delegate messages to modules under the control of other steakholders
-without the fear that they will be disclosed to users.
+Ryoan instances can decrypt them. Steakholders are only allowed remove their own
+lables, and output messages are keep all un-removed labels from the input making
+it possible to delegate computation to modules outside of their control.
+Ryoan will only send completely unlabeld messages to users, so a provider can
+output a labeld message that contains proider secrets with the assurance that
+the response must pass through another of their moduled before it can be
+communicated outside of the dsitributed sandbox.
 
 An example where 23AndMe delegates work to Amazon, then filters the results
 making sure thye are clean of 23AndMe's secrets before sending the final
 response to the user:
 
 <img src="images/dist-ref-mon.png" alt="a single Ryoan instance" width="600">
-
-Per-user and per-provider labels Many instances may communicate in an
-application, supporting multiple code and data owners.
 
 --------------------------------------------------------------------------------
 
