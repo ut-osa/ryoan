@@ -19,13 +19,6 @@ integrity of individual sandbox instances and protect their execution.
 
 -------------------------------------------------------------------------------
 
-A single instance of Ryoan instance. Many instances may communicate in an
-application, supporting multiple code and data owners.
-
-<img src="images/softstack.png" alt="a single Ryoan instance" width="300">
-
--------------------------------------------------------------------------------
-
 A key enabling technology for Ryoan is hardware enclave-protected execution
 (e.g., Intel's software guard extensions (SGX)), a hardware primitive that uses
 trusted hardware to protect a user-level computation from potentially malicious
@@ -43,7 +36,7 @@ Ryoan's security goal is simple: prevent leakage of secret data. However,
  I/O policies that prevent leakage of secrets.
 
  * Several case studies of real-world application scenarios to demonstrate how
- they benefit from the secrecy guarantees of \sys, including an image processing
+ they benefit from the secrecy guarantees of Ryoan, including an image processing
  system, an email spam/virus filter, a personal health analysis tool, and a
  machine translator.
 
@@ -51,7 +44,46 @@ Ryoan's security goal is simple: prevent leakage of secret data. However,
  the execution overheads of each of its building blocks: the SGX enclave,
  confinement, and checkpoint/rollback.
 
+-------------------------------------------------------------------------------
+
+Ryoan confines a directed acyclic graph of communicating modules. Each module is
+a piece of application logic that processes user data while managing its own secrets.
+
+A single instance of the Ryoan sandbox:
+
+<img src="images/softstack.png" alt="a single Ryoan instance" width="300">
+
+Ryoan uses a system of labels to track the data stakeholders of messages as they
+travel from instance to instance. Messages are encrypted so that only other
+Ryoan instances can decrypt them as long as messages are labeled by some
+steakholder. Steakholders can only remove their own lables, and messages generaged
+are labeled by all un-removed labels from the input making it possible
+to delegate messages to modules under the control of other steakholders
+without the fear that they will be disclosed to users.
+
+An example where 23AndMe delegates work to Amazon, then filters the results
+making sure thye are clean of 23AndMe's secrets before sending the final
+response to the user:
+
+<img src="images/dist-ref-mon.png" alt="a single Ryoan instance" width="600">
+
+Per-user and per-provider labels Many instances may communicate in an
+application, supporting multiple code and data owners.
+
 --------------------------------------------------------------------------------
+
+Ryoan uses many tecchniques to confine applicationsd while remaining programable.
+for instance:
+  * Input is consumed by the sandbox all at once so that read patterns do not leak
+    information. Ryoan buffers input so that applications can use familiar stream
+    abstractions.
+  * Output is buffered and padded/truncated to a fixed funtionof the input size.
+    This prevents the confined code from using the write pattern or size to
+    communicate secrets outside of the sandbox.
+  * Encryption/decryption of the input and output are done automatically by Ryoan
+    out of control of the application
+  * Communication patterns are fixed at initialization time and are visible to
+    users so that providers cannot create long chains of leaky enclaves.
 
 Please take a look at our publications for more details about the design:
  * Tyler Hunt, Zhiting Zhu, Yuanzhong Xu, Simon Peter, and Emmett Witchel.
